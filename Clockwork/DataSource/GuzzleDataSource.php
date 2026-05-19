@@ -103,6 +103,9 @@ class GuzzleDataSource extends DataSource
 				'content' => $this->collectContent ? json_decode((string) $response->getBody(), true) : null,
 				'body'    => $this->collectRawContent ? (string) $response->getBody() : null
 			] : null,
+			'result'   => null,
+			'resultAvailable' => (bool) $response,
+			'resultUnavailableReason' => $response ? null : 'HTTP request did not receive a response.',
 			'stats'    => $stats ? (object) [
 				'timing' => isset($stats['total_time_us']) ? (object) [
 					'lookup' => $stats['namelookup_time_us'] / 1000,
@@ -129,6 +132,8 @@ class GuzzleDataSource extends DataSource
 			'duration' => (microtime(true) - $startTime) * 1000,
 			'trace'    => (new Serializer)->trace($trace)
 		];
+
+		$request->result = $request->response;
 		
 		if ($response && $response->getBody()->tell()) $response->getBody()->rewind();
 

@@ -87,6 +87,29 @@ class ClockworkSupport
 		return $this->getData($id, null, null, $filter, true);
 	}
 
+	// Retrieve reproduction details for a request by uuid
+	public function getEventDetailsByUuid($uuid)
+	{
+		if (isset($this->app['session'])) $this->app['session.store']->reflash();
+
+		$authenticator = $this->app['clockwork']->authenticator();
+		$storage = $this->app['clockwork']->storage();
+
+		$authenticated = $authenticator->check($this->app['request']->header('X-Clockwork-Auth'));
+
+		if ($authenticated !== true) {
+			return new JsonResponse([ 'message' => $authenticated, 'requires' => $authenticator->requires() ], 403);
+		}
+
+		$request = $storage->findByUuid($uuid);
+
+		if (! $request) {
+			return new JsonResponse([ 'message' => 'Request not found.' ], 404);
+		}
+
+		return new JsonResponse($request->toEventDetails());
+	}
+
 	// Update metadata
 	public function updateData($id, $input = [])
 	{
@@ -178,6 +201,7 @@ class ClockworkSupport
 		if ($this->isFeatureEnabled('queue')) {
 			$this->app['clockwork.queue']->listenToEvents();
 			$this->app['clockwork.queue']->setCurrentRequestId($this->app['clockwork.request']->id);
+			$this->app['clockwork.queue']->setCurrentRequestUuid($this->app['clockwork.request']->uuid);
 		}
 		if ($this->isFeatureEnabled('redis')) {
 			$this->app[RedisManager::class]->enableEvents();
@@ -322,12 +346,18 @@ class ClockworkSupport
 
 			if (! isset($payload['clockwork_id']) || $this->isQueueJobFiltered($payload['displayName'])) return;
 
-			$request = new Request([ 'id' => $payload['clockwork_id'] ]);
-			if (isset($payload['clockwork_parent_id'])) $request->setParent($payload['clockwork_parent_id']);
+			$request = new Request([
+				'id' => $payload['clockwork_id'],
+				'uuid' => $payload['clockwork_uuid'] ?? null
+			]);
+			if (isset($payload['clockwork_parent_id'])) {
+				$request->setParent($payload['clockwork_parent_id'], [ 'uuid' => $payload['clockwork_parent_uuid'] ?? null ]);
+			}
 
 			$this->app->make('clockwork')->reset()->request($request);
 
 			$this->app['clockwork.queue']->setCurrentRequestId($request->id);
+			$this->app['clockwork.queue']->setCurrentRequestUuid($request->uuid);
 		});
 
 		$this->app['events']->listen(\Illuminate\Queue\Events\JobProcessed::class, function ($event) {
@@ -396,6 +426,7 @@ class ClockworkSupport
 		}
 
 		$response->headers->set('X-Clockwork-Id', $clockworkRequest->id, true);
+		$response->headers->set('X-Clockwork-Uuid', $clockworkRequest->uuid, true);
 		$response->headers->set('X-Clockwork-Version', Clockwork::VERSION, true);
 
 		if ($request->getBasePath()) {
@@ -422,6 +453,7 @@ class ClockworkSupport
 		if ($this->isCollectingClientMetrics() || $this->isToolbarEnabled()) {
 			$clockworkBrowser = [
 				'requestId' => $clockworkRequest->id,
+				'requestUuid' => $clockworkRequest->uuid,
 				'version'   => Clockwork::VERSION,
 				'path'      => $request->getBasePath() . '/__clockwork/',
 				'webPath'   => $request->getBasePath() . '/' . $this->webPaths()[0] . '/app',

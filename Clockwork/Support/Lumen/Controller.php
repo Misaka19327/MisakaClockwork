@@ -52,6 +52,14 @@ class Controller extends LumenController
 		);
 	}
 
+	// Event details retrieving endpoint
+	public function getEventDetails($uuid)
+	{
+		$this->ensureClockworkIsEnabled();
+
+		return $this->clockworkSupport->getEventDetailsByUuid($uuid);
+	}
+
 	// Metadata updating endpoint
 	public function updateData(Request $request, $id = null)
 	{

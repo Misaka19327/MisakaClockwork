@@ -32,6 +32,13 @@ class ClockworkController extends AbstractController
 		return $this->support->getData($request, $id, $direction, $count);
 	}
 
+	public function getEventDetails(Request $request, $uuid)
+	{
+		$this->ensureClockworkIsEnabled();
+
+		return $this->support->getEventDetailsByUuid($request, $uuid);
+	}
+
 	public function webIndex(Request $request)
 	{
 		$this->ensureClockworkIsEnabled();

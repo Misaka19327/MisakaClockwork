@@ -97,6 +97,18 @@ class RedisStorage extends Storage
 		return $this->loadRequest($id);
 	}
 
+	// Return a single request by uuid
+	public function findByUuid($uuid)
+	{
+		if ($id = $this->redis->get($this->prefix("uuid:{$uuid}"))) {
+			return $this->loadRequest($id);
+		}
+
+		foreach ($this->loadRequests($this->redis->zRange($this->prefix('requests'), 0, -1)) as $request) {
+			if ($request->uuid == $uuid) return $request;
+		}
+	}
+
 	// Return the latest request
 	public function latest(?Search $search = null)
 	{
@@ -155,6 +167,10 @@ class RedisStorage extends Storage
 		$this->redis->zAdd($this->prefix('requests'), $data['time'], $data['id']);
 		$this->redis->hMSet($this->prefix($data['id']), $data);
 		if ($this->expiration) $this->redis->expire($this->prefix($data['id']), $this->expiration * 60);
+		if ($data['uuid']) {
+			$this->redis->set($this->prefix("uuid:{$data['uuid']}"), $data['id']);
+			if ($this->expiration) $this->redis->expire($this->prefix("uuid:{$data['uuid']}"), $this->expiration * 60);
+		}
 
 		$this->redis->exec();
 
@@ -174,6 +190,10 @@ class RedisStorage extends Storage
 
 		$this->redis->hMSet($this->prefix($data['id']), $data);
 		if ($this->expiration) $this->redis->expire($this->prefix($data['id']), $this->expiration * 60);
+		if ($data['uuid']) {
+			$this->redis->set($this->prefix("uuid:{$data['uuid']}"), $data['id']);
+			if ($this->expiration) $this->redis->expire($this->prefix("uuid:{$data['uuid']}"), $this->expiration * 60);
+		}
 
 		$this->redis->exec();
 

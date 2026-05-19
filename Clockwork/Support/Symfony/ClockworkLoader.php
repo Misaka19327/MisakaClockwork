@@ -16,6 +16,10 @@ class ClockworkLoader extends Loader
 	{
 		$routes = new RouteCollection();
 
+		$routes->add('clockwork.details', new Route('/__clockwork/uuid/{uuid}/details', [
+			'_controller' => [ ClockworkController::class, 'getEventDetails' ]
+		], [ 'uuid' => '[0-9a-fA-F-]{36}' ]));
+
 		$routes->add('clockwork', new Route('/__clockwork/{id}/{direction}/{count}', [
 			'_controller' => [ ClockworkController::class, 'getData' ],
 			'direction' => null,

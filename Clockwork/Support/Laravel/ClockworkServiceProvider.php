@@ -250,6 +250,8 @@ class ClockworkServiceProvider extends ServiceProvider
 
 	protected function registerRoutes()
 	{
+		$this->app['router']->get('/__clockwork/uuid/{uuid}/details', 'Clockwork\Support\Laravel\ClockworkController@getEventDetails')
+			->where('uuid', '[0-9a-fA-F-]{36}');
 		$this->app['router']->get('/__clockwork/{id}/extended', 'Clockwork\Support\Laravel\ClockworkController@getExtendedData')
 			->where('id', '([0-9-]+|latest)');
 		$this->app['router']->get('/__clockwork/{id}/{direction?}/{count?}', 'Clockwork\Support\Laravel\ClockworkController@getData')

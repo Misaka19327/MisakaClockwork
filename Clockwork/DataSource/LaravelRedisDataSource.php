@@ -65,6 +65,10 @@ class LaravelRedisDataSource extends DataSource
 		$trace = StackTrace::get()->resolveViewName();
 
 		$command = array_merge($command, [
+			'key' => $command['parameters'][0] ?? null,
+			'result' => null,
+			'resultAvailable' => false,
+			'resultUnavailableReason' => 'Laravel Redis command events do not expose command return values.',
 			'trace' => (new Serializer)->trace($trace)
 		]);
 

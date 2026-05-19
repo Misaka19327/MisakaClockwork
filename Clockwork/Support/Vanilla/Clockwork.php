@@ -120,6 +120,7 @@ class Clockwork
 		$clockworkRequest = $this->request();
 
 		$this->setHeader('X-Clockwork-Id', $clockworkRequest->id);
+		$this->setHeader('X-Clockwork-Uuid', $clockworkRequest->uuid);
 		$this->setHeader('X-Clockwork-Version', BaseClockwork::VERSION);
 
 		if ($this->config['api'] != '/__clockwork/') {
@@ -145,6 +146,7 @@ class Clockwork
 
 		return json_encode([
 			'requestId' => $clockworkRequest->id,
+			'requestUuid' => $clockworkRequest->uuid,
 			'version'   => BaseClockwork::VERSION,
 			'path'      => $this->config['api'],
 			'webPath'   => $this->config['web']['enable'],
@@ -191,6 +193,12 @@ class Clockwork
 		if ($authenticated !== true) return;
 
 		if (! $request) $request = $this->defaultMetadataRequest();
+
+		if (preg_match('#uuid/(?<uuid>[0-9a-fA-F-]{36})/details#', $request, $matches)) {
+			$data = $this->clockwork->storage()->findByUuid($matches['uuid']);
+
+			return $data ? $data->toEventDetails() : null;
+		}
 
 		preg_match('#(?<id>[0-9-]+|latest)(?:/(?<direction>next|previous))?(?:/(?<count>\d+))?#', $request, $matches);
 

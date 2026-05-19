@@ -36,6 +36,11 @@ class ClockworkMiddleware
 			return $this->authenticate($request);
 		}
 
+		$clockworkDetailsUri = '#/__clockwork/uuid/(?<uuid>[0-9a-fA-F-]{36})/details#';
+		if (preg_match($clockworkDetailsUri, $request->getUri()->getPath(), $matches)) {
+			return $this->retrieveRequestDetails($request, $matches['uuid']);
+		}
+
 		$clockworkDataUri = '#/__clockwork(?:/(?<id>([0-9-]+|latest)))?(?:/(?<direction>(?:previous|next)))?(?:/(?<count>\d+))?#';
 		if (preg_match($clockworkDataUri, $request->getUri()->getPath(), $matches)) {
 			$matches = array_merge([ 'id' => null, 'direction' => null, 'count' => null ], $matches);
@@ -78,6 +83,22 @@ class ClockworkMiddleware
 		return $this->jsonResponse($data);
 	}
 
+	protected function retrieveRequestDetails(Request $request, $uuid)
+	{
+		$authenticator = $this->clockwork->authenticator();
+		$storage = $this->clockwork->storage();
+
+		$authenticated = $authenticator->check(current($request->getHeader('X-Clockwork-Auth')));
+
+		if ($authenticated !== true) {
+			return $this->jsonResponse([ 'message' => $authenticated, 'requires' => $authenticator->requires() ], 403);
+		}
+
+		$data = $storage->findByUuid($uuid);
+
+		return $this->jsonResponse($data ? $data->toEventDetails() : [ 'message' => 'Request not found.' ], $data ? 200 : 404);
+	}
+
 	protected function logRequest(Request $request, $response)
 	{
 		$this->clockwork->timeline()->finalize($this->startTime);
@@ -90,6 +111,7 @@ class ClockworkMiddleware
 
 		$response = $response
 			->withHeader('X-Clockwork-Id', $clockworkRequest->id)
+			->withHeader('X-Clockwork-Uuid', $clockworkRequest->uuid)
 			->withHeader('X-Clockwork-Version', Clockwork::VERSION);
 
 		if ($basePath = $this->app->getBasePath()) {

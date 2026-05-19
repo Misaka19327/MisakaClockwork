@@ -69,6 +69,7 @@ class ClockworkServiceProvider extends LaravelServiceProvider
 	{
 		$router = $this->app->router ?? $this->app;
 
+		$router->get('/__clockwork/uuid/{uuid:[0-9a-fA-F-]{36}}/details', 'Clockwork\Support\Lumen\Controller@getEventDetails');
 		$router->get('/__clockwork/{id:(?:[0-9-]+|latest)}/extended', 'Clockwork\Support\Lumen\Controller@getExtendedData');
 		$router->get('/__clockwork/{id:(?:[0-9-]+|latest)}[/{direction:(?:next|previous)}[/{count:\d+}]]', 'Clockwork\Support\Lumen\Controller@getData');
 		$router->put('/__clockwork/{id}', 'Clockwork\Support\Lumen\Controller@updateData');

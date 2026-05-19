@@ -20,6 +20,7 @@ class SqlStorage extends Storage
 	// Schema for the Clockwork requests table
 	protected $fields = [
 		'id'                       => 'VARCHAR(100) PRIMARY KEY',
+		'uuid'                     => 'VARCHAR(36) NULL',
 		'version'                  => 'INTEGER',
 		'type'                     => 'VARCHAR(100) NULL',
 		'time'                     => 'DOUBLE PRECISION NULL',
@@ -134,6 +135,16 @@ class SqlStorage extends Storage
 		return end($requests);
 	}
 
+	// Return a single request by uuid
+	public function findByUuid($uuid)
+	{
+		$fields = implode(', ', array_map(function ($field) { return $this->quote($field); }, array_keys($this->fields)));
+		$result = $this->query("SELECT {$fields} FROM {$this->table} WHERE uuid = :uuid", [ 'uuid' => $uuid ]);
+
+		$requests = $this->resultsToRequests($result);
+		return end($requests);
+	}
+
 	// Return the latest request
 	public function latest(?Search $search = null)
 	{
@@ -232,6 +243,10 @@ class SqlStorage extends Storage
 			$indexName = $this->quote("{$this->table}_time_index");
 			$this->pdo->exec("DROP INDEX {$indexName};"); // most sql implementations use global index names
 			$this->pdo->exec("DROP INDEX {$indexName} ON {$backupTableName};"); // mysql uses table-specific index names
+
+			$uuidIndexName = $this->quote("{$this->table}_uuid_index");
+			$this->pdo->exec("DROP INDEX {$uuidIndexName};");
+			$this->pdo->exec("DROP INDEX {$uuidIndexName} ON {$backupTableName};");
 		} catch (\PDOException $e) {
 			// this just means the table doesn't yet exist, nothing to do here
 		}
@@ -241,6 +256,9 @@ class SqlStorage extends Storage
 
 		$indexName = $this->quote("{$this->table}_time_index");
 		$this->pdo->exec("CREATE INDEX {$indexName} ON {$table} (". $this->quote('time') .')');
+
+		$uuidIndexName = $this->quote("{$this->table}_uuid_index");
+		$this->pdo->exec("CREATE INDEX {$uuidIndexName} ON {$table} (". $this->quote('uuid') .')');
 	}
 
 	// Builds the query to create Clockwork database table

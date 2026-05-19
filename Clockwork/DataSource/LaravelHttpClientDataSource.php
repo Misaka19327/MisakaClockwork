@@ -94,6 +94,9 @@ class LaravelHttpClientDataSource extends DataSource
 			'content' => $this->collectContent ? $event->response->json() : null,
 			'body'    => $this->collectRawContent ? $event->response->body() : null
 		];
+		$request->result = $request->response;
+		$request->resultAvailable = true;
+		$request->resultUnavailableReason = null;
 		$request->stats = (object) [
 			'timing' => isset($stats['total_time_us']) ? (object) [
 				'lookup' => $stats['namelookup_time_us'] / 1000,
@@ -131,6 +134,9 @@ class LaravelHttpClientDataSource extends DataSource
 		
 		$request->duration = (microtime(true) - $request->time) * 1000;
 		$request->error = 'connection-failed';
+		$request->result = null;
+		$request->resultAvailable = false;
+		$request->resultUnavailableReason = 'HTTP connection failed before a response was received.';
 
 		unset($this->executingRequests[spl_object_hash($event->request)]);
 	}

@@ -52,6 +52,22 @@ class ClockworkSupport
 		return new JsonResponse($data);
 	}
 
+	public function getEventDetailsByUuid(Request $request, $uuid)
+	{
+		$authenticator = $this->container->get('clockwork')->authenticator();
+		$storage = $this->container->get('clockwork')->storage();
+
+		$authenticated = $authenticator->check($request->headers->get('X-Clockwork-Auth'));
+
+		if ($authenticated !== true) {
+			return new JsonResponse([ 'message' => $authenticated, 'requires' => $authenticator->requires() ], 403);
+		}
+
+		$data = $storage->findByUuid($uuid);
+
+		return new JsonResponse($data ? $data->toEventDetails() : [ 'message' => 'Request not found.' ], $data ? 200 : 404);
+	}
+
 	public function getWebAsset($path)
 	{
 		$web = new Web;

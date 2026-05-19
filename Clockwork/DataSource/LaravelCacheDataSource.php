@@ -111,6 +111,13 @@ class LaravelCacheDataSource extends DataSource
 
 		if ($this->collectValues && isset($query['value'])) {
 			$record['value'] = (new Serializer)->normalize($query['value']);
+			$record['result'] = $record['value'];
+			$record['resultAvailable'] = true;
+			$record['resultUnavailableReason'] = null;
+		} else {
+			$record['result'] = null;
+			$record['resultAvailable'] = false;
+			$record['resultUnavailableReason'] = 'Cache event did not expose a value.';
 		}
 
 		$this->incrementQueryCount($record);

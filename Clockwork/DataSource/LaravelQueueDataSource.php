@@ -17,6 +17,9 @@ class LaravelQueueDataSource extends DataSource
 	// Clockwork ID of the current request
 	protected $currentRequestId;
 
+	// Clockwork UUID of the current request
+	protected $currentRequestUuid;
+
 	// Create a new data source instance, takes a queue as an argument
 	public function __construct(Queue $queue)
 	{
@@ -41,8 +44,12 @@ class LaravelQueueDataSource extends DataSource
 	public function listenToEvents()
 	{
 		$this->queue->createPayloadUsing(function ($connection, $queue, $payload) {
+			$request = new Request;
+
 			$this->registerJob([
-				'id'         => $id = (new Request)->id,
+				'id'         => $request->id,
+				'uuid'       => $request->uuid,
+				'parentUuid' => $this->currentRequestUuid,
 				'connection' => $connection,
 				'queue'      => $queue,
 				'name'       => $payload['displayName'],
@@ -52,7 +59,12 @@ class LaravelQueueDataSource extends DataSource
 				'time'       => microtime(true)
 			]);
 
-			return [ 'clockwork_id' => $id, 'clockwork_parent_id' => $this->currentRequestId ];
+			return [
+				'clockwork_id' => $request->id,
+				'clockwork_uuid' => $request->uuid,
+				'clockwork_parent_id' => $this->currentRequestId,
+				'clockwork_parent_uuid' => $this->currentRequestUuid
+			];
 		});
 	}
 
@@ -60,6 +72,13 @@ class LaravelQueueDataSource extends DataSource
 	public function setCurrentRequestId($requestId)
 	{
 		$this->currentRequestId = $requestId;
+		return $this;
+	}
+
+	// Set Clockwork UUID of the current request
+	public function setCurrentRequestUuid($requestUuid)
+	{
+		$this->currentRequestUuid = $requestUuid;
 		return $this;
 	}
 

@@ -182,6 +182,9 @@ class EloquentDataSource extends DataSource
 		$query = [
 			'query'      => $this->createRunnableQuery($event->sql, $event->bindings, $event->connectionName),
 			'duration'   => $event->time,
+			'result'     => null,
+			'resultAvailable' => false,
+			'resultUnavailableReason' => 'Laravel query events do not expose database result sets.',
 			'connection' => $event->connectionName,
 			'time'       => microtime(true) - $event->time / 1000,
 			'trace'      => (new Serializer)->trace($trace),
@@ -219,6 +222,9 @@ class EloquentDataSource extends DataSource
 		$query = [
 			'query'      => $name,
 			'duration'   => 0,
+			'result'     => null,
+			'resultAvailable' => false,
+			'resultUnavailableReason' => 'Transaction events do not expose database result sets.',
 			'connection' => $event->connectionName,
 			'time'       => microtime(true),
 			'trace'      => (new Serializer)->trace($trace),

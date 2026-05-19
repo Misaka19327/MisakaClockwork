@@ -8,6 +8,9 @@ class Request
 	// Unique request ID
 	public $id;
 
+	// Unique request UUID
+	public $uuid;
+
 	// Metadata version
 	public $version = 1;
 
@@ -219,6 +222,7 @@ class Request
 	public function __construct(array $data = [])
 	{
 		$this->id = $data['id'] ?? $this->generateRequestId();
+		$this->uuid = $data['uuid'] ?? $this->generateUuid();
 		$this->time = microtime(true);
 		$this->updateToken = $data['updateToken'] ?? $this->generateUpdateToken();
 
@@ -233,6 +237,7 @@ class Request
 	{
 		return [
 			'id'                       => $this->id,
+			'uuid'                     => $this->uuid,
 			'version'                  => $this->version,
 			'type'                     => $this->type,
 			'time'                     => $this->time,
@@ -252,7 +257,7 @@ class Request
 			'responseDuration'         => $this->responseDuration ?? $this->getResponseDuration(),
 			'memoryUsage'              => $this->memoryUsage,
 			'middleware'               => $this->middleware,
-			'databaseQueries'          => $this->databaseQueries,
+			'databaseQueries'          => $this->databaseQueriesWithContext(),
 			'databaseQueriesCount'     => $this->databaseQueriesCount ?? $this->getDatabaseQueriesCount(),
 			'databaseSlowQueries'      => $this->databaseSlowQueries ?? $this->getDatabaseSlowQueriesCount(),
 			'databaseSelects'          => $this->databaseSelects ?? $this->getDatabaseSelects(),
@@ -261,7 +266,7 @@ class Request
 			'databaseDeletes'          => $this->databaseDeletes ?? $this->getDatabaseDeletes(),
 			'databaseOthers'           => $this->databaseOthers ?? $this->getDatabaseOthers(),
 			'databaseDuration'         => $this->databaseDuration ?? $this->getDatabaseDuration(),
-			'cacheQueries'             => $this->cacheQueries,
+			'cacheQueries'             => $this->cacheQueriesWithContext(),
 			'cacheReads'               => $this->cacheReads ?? $this->getCacheReads(),
 			'cacheHits'                => $this->cacheHits ?? $this->getCacheHits(),
 			'cacheWrites'              => $this->cacheWrites ?? $this->getCacheWrites(),
@@ -272,7 +277,7 @@ class Request
 			'modelsCreated'            => $this->modelsCreated ?? $this->getModelsCreated(),
 			'modelsUpdated'            => $this->modelsUpdated ?? $this->getModelsUpdated(),
 			'modelsDeleted'            => $this->modelsDeleted ?? $this->getModelsDeleted(),
-			'redisCommands'            => $this->redisCommands,
+			'redisCommands'            => $this->redisCommandsWithContext(),
 			'queueJobs'                => $this->queueJobs,
 			'timelineData'             => $this->timeline()->toArray(),
 			'log'                      => $this->log()->toArray(),
@@ -284,7 +289,7 @@ class Request
 			'userData'                 => array_map(function ($data) {
 				return $data instanceof UserData ? $data->toArray() : $data;
 			}, $this->userData),
-			'httpRequests'             => $this->httpRequests,
+			'httpRequests'             => $this->httpRequestsWithContext(),
 			'subrequests'              => $this->subrequests,
 			'xdebug'                   => $this->xdebug,
 			'commandName'              => $this->commandName,
@@ -351,10 +356,16 @@ class Request
 	// model (associated ORM model)
 	public function addDatabaseQuery($query, $bindings = [], $duration = null, $data = [])
 	{
+		$resultAvailable = array_key_exists('result', $data);
+
 		$this->databaseQueries[] = [
+			'requestUuid' => $this->uuid,
 			'query'      => $query,
 			'bindings'   => (new Serializer)->normalize($bindings),
 			'duration'   => $duration,
+			'result'     => $resultAvailable ? (new Serializer)->normalize($data['result']) : null,
+			'resultAvailable' => $data['resultAvailable'] ?? $resultAvailable,
+			'resultUnavailableReason' => $data['resultUnavailableReason'] ?? ($resultAvailable ? null : 'Result was not provided by the data source.'),
 			'connection' => $data['connection'] ?? null,
 			'time'       => $data['time'] ?? microtime(true) - ($duration ?: 0) / 1000,
 			'file'       => $data['file'] ?? null,
@@ -373,6 +384,7 @@ class Request
 	public function addModelAction($model, $action, $data = [])
 	{
 		$this->modelsActions[] = [
+			'requestUuid' => $this->uuid,
 			'model'      => $model,
 			'key'        => $data['key'] ?? null,
 			'action'     => $action,
@@ -394,10 +406,17 @@ class Request
 	// expiration
 	public function addCacheQuery($type, $key, $value = null, $duration = null, $data = [])
 	{
+		$resultAvailable = array_key_exists('result', $data) || $value !== null;
+		$result = array_key_exists('result', $data) ? $data['result'] : $value;
+
 		$this->cacheQueries[] = [
+			'requestUuid' => $this->uuid,
 			'type'       => $type,
 			'key'        => $key,
 			'value'      => (new Serializer)->normalize($value),
+			'result'     => (new Serializer)->normalize($result),
+			'resultAvailable' => $data['resultAvailable'] ?? $resultAvailable,
+			'resultUnavailableReason' => $data['resultUnavailableReason'] ?? ($resultAvailable ? null : 'Cache event did not expose a value.'),
 			'duration'   => $duration,
 			'connection' => $data['connection'] ?? null,
 			'time'       => $data['time'] ?? microtime(true) - ($duration ?: 0) / 1000,
@@ -517,6 +536,7 @@ class Request
 	{
 		$this->parent = [
 			'id'   => $id,
+			'uuid' => $data['uuid'] ?? null,
 			'url'  => $data['url'] ?? null,
 			'path' => $data['path'] ?? null
 		];
@@ -543,6 +563,198 @@ class Request
 			'trace'     => $trace,
 			'passed'    => $passed
 		];
+	}
+
+	// Return a problem reproduction payload for a single request or command
+	public function toEventDetails()
+	{
+		return [
+			'uuid'           => $this->uuid,
+			'id'             => $this->id,
+			'type'           => $this->type,
+			'time'           => $this->time,
+			'entrypoint'     => [
+				'method'    => $this->method,
+				'url'       => $this->url,
+				'uri'       => $this->uri,
+				'controller'=> $this->controller,
+				'command'   => $this->commandName,
+				'job'       => $this->jobName,
+				'test'      => $this->testName
+			],
+			'parameters'     => [
+				'query'           => $this->getData,
+				'post'            => $this->postData,
+				'request'         => $this->requestData,
+				'commandArguments'=> $this->commandArguments,
+				'commandOptions'  => $this->commandOptions,
+				'jobPayload'      => $this->jobPayload,
+				'testAsserts'     => $this->testAsserts
+			],
+			'response'       => [
+				'status'     => $this->responseStatus,
+				'duration'   => $this->responseDuration ?? ($this->responseTime ? $this->getResponseDuration() : null),
+				'memoryUsage'=> $this->memoryUsage,
+				'commandExitCode' => $this->commandExitCode,
+				'commandOutput'   => $this->commandOutput,
+				'jobStatus'       => $this->jobStatus,
+				'testStatus'      => $this->testStatus,
+				'testStatusMessage' => $this->testStatusMessage
+			],
+			'errors'         => $this->getErrorInformation(),
+			'externalAccess' => [
+				'database' => $this->databaseQueriesWithContext(),
+				'cache'    => $this->cacheQueriesWithContext(),
+				'redis'    => $this->redisCommandsWithContext(),
+				'http'     => $this->httpRequestsWithContext()
+			],
+			'context'        => [
+				'headers'           => $this->headers,
+				'cookies'           => $this->cookies,
+				'session'           => $this->sessionData,
+				'authenticatedUser' => $this->authenticatedUser,
+				'middleware'        => $this->middleware,
+				'routes'            => $this->routes,
+				'log'               => $this->log()->toArray(),
+				'timeline'          => $this->timeline()->toArray(),
+				'events'            => $this->events,
+				'userData'          => array_map(function ($data) {
+					return $data instanceof UserData ? $data->toArray() : $data;
+				}, $this->userData),
+				'parent'            => $this->parent,
+				'subrequests'       => $this->subrequests
+			],
+			'raw'            => $this->except([ 'updateToken' ])
+		];
+	}
+
+	protected function getErrorInformation()
+	{
+		$errors = [];
+
+		if ($this->responseStatus >= 400) {
+			$errors[] = [ 'type' => 'response', 'status' => $this->responseStatus ];
+		}
+
+		if ($this->commandExitCode !== null && $this->commandExitCode != 0) {
+			$errors[] = [ 'type' => 'command', 'exitCode' => $this->commandExitCode, 'output' => $this->commandOutput ];
+		}
+
+		if ($this->jobStatus == 'failed') {
+			$errors[] = [ 'type' => 'queue-job', 'status' => $this->jobStatus ];
+		}
+
+		if ($this->testStatus && $this->testStatus != 'passed') {
+			$errors[] = [ 'type' => 'test', 'status' => $this->testStatus, 'message' => $this->testStatusMessage ];
+		}
+
+		foreach ($this->log()->toArray() as $message) {
+			if (in_array($message['level'] ?? null, [ 'emergency', 'alert', 'critical', 'error' ])) {
+				$errors[] = [ 'type' => 'log', 'message' => $message ];
+			}
+		}
+
+		foreach ($this->httpRequestsWithContext() as $httpRequest) {
+			$status = is_object($httpRequest)
+				? ($httpRequest->response->status ?? null)
+				: ($httpRequest['response']['status'] ?? null);
+
+			if ($status >= 400 || (is_object($httpRequest) ? $httpRequest->error ?? null : $httpRequest['error'] ?? null)) {
+				$errors[] = [ 'type' => 'http', 'request' => $httpRequest ];
+			}
+		}
+
+		return $errors;
+	}
+
+	protected function databaseQueriesWithContext()
+	{
+		return array_map(function ($query) {
+			$query = $this->withRequestUuid($query);
+			$query = $this->withDefaultField($query, 'result', null);
+			$query = $this->withDefaultField($query, 'resultAvailable', $this->hasField($query, 'result') && $this->field($query, 'result') !== null);
+			return $this->withDefaultField(
+				$query,
+				'resultUnavailableReason',
+				$this->field($query, 'resultAvailable') ? null : 'Database listener did not expose a result value.'
+			);
+		}, $this->databaseQueries);
+	}
+
+	protected function cacheQueriesWithContext()
+	{
+		return array_map(function ($query) {
+			$query = $this->withRequestUuid($query);
+			$query = $this->withDefaultField($query, 'result', $this->field($query, 'value'));
+			$query = $this->withDefaultField($query, 'resultAvailable', $this->field($query, 'result') !== null);
+			return $this->withDefaultField(
+				$query,
+				'resultUnavailableReason',
+				$this->field($query, 'resultAvailable') ? null : 'Cache event did not expose a value.'
+			);
+		}, $this->cacheQueries);
+	}
+
+	protected function redisCommandsWithContext()
+	{
+		return array_map(function ($command) {
+			$command = $this->withRequestUuid($command);
+			$parameters = $this->field($command, 'parameters') ?: [];
+			$command = $this->withDefaultField($command, 'key', $parameters[0] ?? null);
+			$command = $this->withDefaultField($command, 'result', null);
+			$command = $this->withDefaultField($command, 'resultAvailable', $this->field($command, 'result') !== null);
+			return $this->withDefaultField(
+				$command,
+				'resultUnavailableReason',
+				$this->field($command, 'resultAvailable') ? null : 'Laravel Redis command events do not expose command return values.'
+			);
+		}, $this->redisCommands);
+	}
+
+	protected function httpRequestsWithContext()
+	{
+		return array_map(function ($request) {
+			$request = $this->withRequestUuid($request);
+			$request = $this->withDefaultField($request, 'result', $this->field($request, 'response'));
+			$request = $this->withDefaultField($request, 'resultAvailable', $this->field($request, 'response') !== null);
+			return $this->withDefaultField(
+				$request,
+				'resultUnavailableReason',
+				$this->field($request, 'resultAvailable') ? null : 'HTTP request did not receive a response.'
+			);
+		}, $this->httpRequests);
+	}
+
+	protected function withRequestUuid($value)
+	{
+		if (is_array($value)) {
+			$value['requestUuid'] = $value['requestUuid'] ?? $this->uuid;
+		} elseif (is_object($value)) {
+			$value->requestUuid = $value->requestUuid ?? $this->uuid;
+		}
+
+		return $value;
+	}
+
+	protected function withDefaultField($value, $field, $default)
+	{
+		if (is_array($value)) {
+			if (! array_key_exists($field, $value)) $value[$field] = $default;
+		} elseif (is_object($value) && ! property_exists($value, $field)) {
+			$value->$field = $default;
+		}
+
+		return $value;
+	}
+
+	protected function hasField($value, $field)
+	{
+		return is_array($value) ? array_key_exists($field, $value) : (is_object($value) && property_exists($value, $field));
+	}
+
+	protected function field($value, $field)
+	{
+		return is_array($value) ? ($value[$field] ?? null) : (is_object($value) ? ($value->$field ?? null) : null);
 	}
 
 	// Compute response duration in milliseconds
@@ -689,6 +901,17 @@ class Request
 	protected function generateRequestId()
 	{
 		return str_replace('.', '-', sprintf('%.4F', microtime(true))) . '-' . mt_rand();
+	}
+
+	// Generate a RFC 4122 version 4 UUID
+	protected function generateUuid()
+	{
+		$bytes = function_exists('random_bytes') ? random_bytes(16) : openssl_random_pseudo_bytes(16);
+
+		$bytes[6] = chr(ord($bytes[6]) & 0x0f | 0x40);
+		$bytes[8] = chr(ord($bytes[8]) & 0x3f | 0x80);
+
+		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
 	}
 
 	// Generate a random update token

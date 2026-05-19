@@ -42,6 +42,14 @@ class ClockworkController extends Controller
 		);
 	}
 
+	// Event details retrieving endpoint
+	public function getEventDetails(ClockworkSupport $clockworkSupport, $uuid)
+	{
+		$this->ensureClockworkIsEnabled($clockworkSupport);
+
+		return $clockworkSupport->getEventDetailsByUuid($uuid);
+	}
+
 	// Metadata updating endpoint
 	public function updateData(ClockworkSupport $clockworkSupport, Request $request, $id = null)
 	{

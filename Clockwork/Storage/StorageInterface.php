@@ -11,6 +11,9 @@ interface StorageInterface
 	// Return a single request by id
 	public function find($id);
 
+	// Return a single request by uuid
+	public function findByUuid($uuid);
+
 	// Return the latest request
 	public function latest(?Search $search = null);
 
