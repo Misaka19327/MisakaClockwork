@@ -113,7 +113,7 @@ export class ClockworkClient {
 
   async fetchLatest(): Promise<ClockworkRequest | null> {
     try {
-      return await this.request<ClockworkRequest>('')
+      return await this.request<ClockworkRequest>('latest')
     } catch (error) {
       if ((error as Error).message === 'NOT_FOUND') {
         return null
@@ -128,10 +128,8 @@ export class ClockworkClient {
     filters?: SearchFilters,
   ): Promise<ClockworkRequest[]> {
     const params = this.buildQueryParams(filters)
-    params.set('direction', 'next')
-    params.set('count', String(count))
-    params.set('id', id)
-    return this.request<ClockworkRequest[]>(`?${params.toString()}`)
+    const query = params.toString()
+    return this.request<ClockworkRequest[]>(`${id}/next/${count}${query ? '?' + query : ''}`)
   }
 
   async fetchPrevious(
@@ -140,10 +138,8 @@ export class ClockworkClient {
     filters?: SearchFilters,
   ): Promise<ClockworkRequest[]> {
     const params = this.buildQueryParams(filters)
-    params.set('direction', 'prev')
-    params.set('count', String(count))
-    params.set('id', id)
-    return this.request<ClockworkRequest[]>(`?${params.toString()}`)
+    const query = params.toString()
+    return this.request<ClockworkRequest[]>(`${id}/previous/${count}${query ? '?' + query : ''}`)
   }
 
   async fetchExtended(
