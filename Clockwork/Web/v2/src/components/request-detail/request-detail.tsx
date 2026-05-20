@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { formatDuration, formatMemory } from '@/utils/format'
 import type { ClockworkRequest } from '@/types/clockwork'
+import { Copy } from 'lucide-react'
 import { MethodBadge } from './shared/method-badge'
 import { StatusBadge } from './shared/status-badge'
 import { TabBar, type TabDef } from './tab-bar'
@@ -130,6 +131,20 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
             {formatMemory(request.memoryUsage)}
           </span>
         )}
+      </div>
+
+      {/* UUID row */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-4 py-1">
+        <span className="text-[11px] text-muted-foreground">UUID</span>
+        <code className="text-[11px] font-mono text-foreground/70 select-all">{request.uuid}</code>
+        <button
+          type="button"
+          onClick={() => navigator.clipboard.writeText(request.uuid)}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          title="Copy UUID"
+        >
+          <Copy className="h-3 w-3" />
+        </button>
       </div>
 
       {/* Tab bar */}
