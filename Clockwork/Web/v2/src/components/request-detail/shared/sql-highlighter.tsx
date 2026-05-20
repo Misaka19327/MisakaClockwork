@@ -23,7 +23,7 @@ export function SqlHighlighter({ sql, className, maxHeight = 200 }: SqlHighlight
       try {
         return Prism.highlight(sql, Prism.languages.sql, 'sql')
       } catch {
-        return sql.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        return sql.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
       }
     }
   }, [sql])

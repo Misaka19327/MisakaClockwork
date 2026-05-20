@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { formatDuration, formatMemory } from '@/utils/format'
 import type { ClockworkRequest } from '@/types/clockwork'
@@ -91,7 +91,7 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
   }, [request])
 
   // Reset tab if it's no longer valid
-  useMemo(() => {
+  useEffect(() => {
     if (tabs.length > 0 && !tabs.find((t) => t.id === activeTab)) {
       setActiveTab(tabs[0].id)
     }

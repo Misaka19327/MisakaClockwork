@@ -31,7 +31,7 @@ class QueryResultCapture
 
 	public static function store($connectionName, $sql, $bindings, $result)
 	{
-		$key = md5($sql . serialize($bindings));
+		$key = md5($sql . json_encode($bindings));
 
 		if (! isset(static::$results[$connectionName])) {
 			static::$results[$connectionName] = [];
@@ -42,7 +42,7 @@ class QueryResultCapture
 
 	public static function consume($connectionName, $sql, $bindings)
 	{
-		$key = md5($sql . serialize($bindings));
+		$key = md5($sql . json_encode($bindings));
 
 		if (isset(static::$results[$connectionName][$key])) {
 			$result = static::$results[$connectionName][$key];

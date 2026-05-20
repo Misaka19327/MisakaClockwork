@@ -1,20 +1,15 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { client } from './client'
 import { useRequestStore } from '@/stores/request-store'
 import type { ClockworkRequest, SearchFilters } from '@/types/clockwork'
 
-const STALE_TIME = 30_000
-const DETAIL_STALE_TIME = 60_000
-
 export function useRequestList(filters: SearchFilters) {
-  const queryClient = useQueryClient()
   const setRequests = useRequestStore((s) => s.setRequests)
   const prependRequests = useRequestStore((s) => s.prependRequests)
   const requests = useRequestStore((s) => s.requests)
-  const oldestId = useRequestStore((s) => s.oldestId)
   const searchFilters = useRequestStore((s) => s.searchFilters)
-  const initialized = useRef(false)
+  const [initialized, setInitialized] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Bootstrap: load latest + one page of older
@@ -39,7 +34,7 @@ export function useRequestList(filters: SearchFilters) {
         if (cancelled) return
         const all = [latest, ...previous]
         setRequests(all)
-        initialized.current = true
+        setInitialized(true)
       } catch (e) {
         console.error('[Clockwork] Failed to bootstrap request list:', e)
       }
@@ -52,7 +47,7 @@ export function useRequestList(filters: SearchFilters) {
 
   // Poll for new requests every 1 second
   useEffect(() => {
-    if (!initialized.current) return
+    if (!initialized) return
 
     intervalRef.current = setInterval(async () => {
       if (requests.length === 0) return
@@ -70,9 +65,9 @@ export function useRequestList(filters: SearchFilters) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [requests.length, searchFilters, prependRequests])
+  }, [initialized, requests.length, searchFilters, prependRequests])
 
-  return { isLoading: !initialized.current }
+  return { isLoading: !initialized }
 }
 
 export function useLoadOlder(
@@ -95,15 +90,11 @@ export function useLoadOlder(
 }
 
 export function useRequestDetail(id: string | null) {
-  const queryClient = useQueryClient()
-
   const queryKey = ['clockwork', 'requests', 'detail', id]
 
-  // Check if we already have this request in the store
   const requests = useRequestStore((s) => s.requests)
   const cached = id ? requests.find((r) => r.id === id) : null
 
-  // Use TanStack Query for detail fetching (supports extended data, caching)
   const query = useQueryClient().getQueryData<ClockworkRequest>(queryKey)
 
   return {
@@ -119,7 +110,6 @@ export function useExtendedRequest(id: string | null) {
   const data = queryClient.getQueryData<ClockworkRequest>(queryKey)
   const isLoading = !!id && !data
 
-  // Trigger fetch if not cached
   useEffect(() => {
     if (!id) return
     client.fetchExtended(id).then((result) => {
