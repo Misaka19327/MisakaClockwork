@@ -2,7 +2,7 @@
 
 use Clockwork\Helpers\{Serializer, StackTrace};
 use Clockwork\Request\Request;
-use Clockwork\Support\Laravel\Eloquent\{ResolveModelLegacyScope, ResolveModelScope};
+use Clockwork\Support\Laravel\Eloquent\{QueryResultCapture, ResolveModelLegacyScope, ResolveModelScope};
 
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Contracts\Events\Dispatcher as EventDispatcher;
@@ -49,12 +49,18 @@ class EloquentDataSource extends DataSource
 	// Enable duplicate queries detection
 	protected $detectDuplicateQueries = false;
 
+	// Whether to collect query results
+	protected $collectResults = false;
+
+	// Maximum number of rows to collect per query result
+	protected $maxResultRows = 25;
+
 	// Model name to associate with the next executed query, used to map queries to models
 	public $nextQueryModel;
 
 	// Create a new data source instance, takes a database manager, an event dispatcher as arguments and additional
 	// options as arguments
-	public function __construct(ConnectionResolverInterface $databaseManager, EventDispatcher $eventDispatcher, $collectQueries = true, $slowThreshold = null, $slowOnly = false, $detectDuplicateQueries = false, $collectModelsActions = true, $collectModelsRetrieved = false)
+	public function __construct(ConnectionResolverInterface $databaseManager, EventDispatcher $eventDispatcher, $collectQueries = true, $slowThreshold = null, $slowOnly = false, $detectDuplicateQueries = false, $collectModelsActions = true, $collectModelsRetrieved = false, $collectResults = false, $maxResultRows = 25)
 	{
 		$this->databaseManager = $databaseManager;
 		$this->eventDispatcher = $eventDispatcher;
@@ -64,6 +70,8 @@ class EloquentDataSource extends DataSource
 		$this->detectDuplicateQueries = $detectDuplicateQueries;
 		$this->collectModelsActions   = $collectModelsActions;
 		$this->collectModelsRetrieved = $collectModelsRetrieved;
+		$this->collectResults         = $collectResults;
+		$this->maxResultRows          = $maxResultRows;
 
 		if ($slowOnly) $this->addFilter(function ($query) { return $query['duration'] > $this->slowThreshold; });
 	}
@@ -109,6 +117,8 @@ class EloquentDataSource extends DataSource
 		$this->nextQueryModel = null;
 
 		if ($this->detectDuplicateQueries) $this->duplicateQueries = [];
+
+		if ($this->collectResults) QueryResultCapture::clear();
 	}
 
 	// Start listening to Eloquent events
@@ -179,12 +189,18 @@ class EloquentDataSource extends DataSource
 
 		if ($this->detectDuplicateQueries) $this->detectDuplicateQuery($trace);
 
+		$captured = $this->collectResults
+			? QueryResultCapture::consume($event->connectionName, $event->sql, $event->bindings)
+			: null;
+
 		$query = [
 			'query'      => $this->createRunnableQuery($event->sql, $event->bindings, $event->connectionName),
 			'duration'   => $event->time,
-			'result'     => null,
-			'resultAvailable' => false,
-			'resultUnavailableReason' => 'Laravel query events do not expose database result sets.',
+			'result'     => $captured ? (new Serializer)->normalize($captured['result']) : null,
+			'resultAvailable' => $captured ? true : false,
+			'resultUnavailableReason' => $captured
+				? ($captured['truncated'] ? "Result truncated to {$this->maxResultRows} rows (total: {$captured['totalRows']})." : null)
+				: ($this->collectResults ? 'Query result was not captured.' : 'Laravel query events do not expose database result sets.'),
 			'connection' => $event->connectionName,
 			'time'       => microtime(true) - $event->time / 1000,
 			'trace'      => (new Serializer)->trace($trace),

@@ -58,7 +58,13 @@ return [
 			'slow_only' => env('CLOCKWORK_DATABASE_SLOW_ONLY', false),
 
 			// Detect and report duplicate queries
-			'detect_duplicate_queries' => env('CLOCKWORK_DATABASE_DETECT_DUPLICATE_QUERIES', false)
+			'detect_duplicate_queries' => env('CLOCKWORK_DATABASE_DETECT_DUPLICATE_QUERIES', false),
+
+			// Collect database query results (high performance impact with large result sets)
+			'collect_results' => env('CLOCKWORK_DATABASE_COLLECT_RESULTS', false),
+
+			// Maximum number of rows to collect per query result (0 for unlimited)
+			'max_result_rows' => env('CLOCKWORK_DATABASE_MAX_RESULT_ROWS', 25)
 		],
 
 		// Dispatched events

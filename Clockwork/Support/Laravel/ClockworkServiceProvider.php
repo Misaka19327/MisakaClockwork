@@ -10,7 +10,12 @@ use Clockwork\DataSource\{
 use Clockwork\Helpers\StackFilter;
 use Clockwork\Request\Request;
 use Clockwork\Storage\StorageInterface;
+use Clockwork\Support\Laravel\Eloquent\{
+	CapturingMySqlConnection, CapturingPostgresConnection, CapturingSqliteConnection, CapturingSqlServerConnection,
+	QueryResultCapture
+};
 
+use Illuminate\Database\Connection;
 use Illuminate\Support\ServiceProvider;
 
 class ClockworkServiceProvider extends ServiceProvider
@@ -47,6 +52,7 @@ class ClockworkServiceProvider extends ServiceProvider
 		$this->registerClockwork();
 		$this->registerCommands();
 		$this->registerDataSources();
+		$this->registerConnectionResolvers();
 		$this->registerAliases();
 
 		$this->app->make('clockwork.request'); // instantiate the request to have id and time available as early as possible
@@ -118,7 +124,9 @@ class ClockworkServiceProvider extends ServiceProvider
 				$app['clockwork.support']->getConfig('features.database.slow_only'),
 				$app['clockwork.support']->getConfig('features.database.detect_duplicate_queries'),
 				$app['clockwork.support']->getConfig('features.database.collect_models_actions'),
-				$app['clockwork.support']->getConfig('features.database.collect_models_retrieved')
+				$app['clockwork.support']->getConfig('features.database.collect_models_retrieved'),
+				$app['clockwork.support']->getConfig('features.database.collect_results', false),
+				$app['clockwork.support']->getConfig('features.database.max_result_rows', 25)
 			));
 
 			// if we are collecting queue jobs, filter out queries caused by the database queue implementation
@@ -207,6 +215,32 @@ class ClockworkServiceProvider extends ServiceProvider
 
 		$this->app->singleton('clockwork.xdebug', function ($app) {
 			return new XdebugDataSource;
+		});
+	}
+
+	// Register custom connection resolvers to capture query results
+	protected function registerConnectionResolvers()
+	{
+		if (! $this->app['clockwork.support']->getConfig('features.database.collect_results', false)) return;
+
+		$maxRows = $this->app['clockwork.support']->getConfig('features.database.max_result_rows', 25);
+
+		QueryResultCapture::enable($maxRows);
+
+		Connection::resolverFor('mysql', function ($connection, $database, $prefix, $config) {
+			return new CapturingMySqlConnection($connection, $database, $prefix, $config);
+		});
+
+		Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
+			return new CapturingPostgresConnection($connection, $database, $prefix, $config);
+		});
+
+		Connection::resolverFor('sqlite', function ($connection, $database, $prefix, $config) {
+			return new CapturingSqliteConnection($connection, $database, $prefix, $config);
+		});
+
+		Connection::resolverFor('sqlsrv', function ($connection, $database, $prefix, $config) {
+			return new CapturingSqlServerConnection($connection, $database, $prefix, $config);
 		});
 	}
 
