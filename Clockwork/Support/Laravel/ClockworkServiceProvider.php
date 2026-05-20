@@ -300,6 +300,12 @@ class ClockworkServiceProvider extends ServiceProvider
 		$this->app['clockwork.support']->webPaths()->each(function ($path) {
 			$this->app['router']->get("{$path}", 'Clockwork\Support\Laravel\ClockworkController@webRedirect');
 			$this->app['router']->get("{$path}/app", 'Clockwork\Support\Laravel\ClockworkController@webIndex');
+
+			// v2 routes must be registered before the catch-all {path} route
+			$this->app['router']->get("{$path}/v2/app", 'Clockwork\Support\Laravel\ClockworkController@webV2Index');
+			$this->app['router']->get("{$path}/v2/{path}", 'Clockwork\Support\Laravel\ClockworkController@webV2Asset')
+				->where('path', '.+');
+
 			$this->app['router']->get("{$path}/{path}", 'Clockwork\Support\Laravel\ClockworkController@webAsset')
 				->where('path', '.+');
 		});
@@ -307,11 +313,8 @@ class ClockworkServiceProvider extends ServiceProvider
 
 	protected function registerWebV2Routes()
 	{
-		$this->app['clockwork.support']->webPaths()->each(function ($path) {
-			$this->app['router']->get("{$path}/v2/app", 'Clockwork\Support\Laravel\ClockworkController@webV2Index');
-			$this->app['router']->get("{$path}/v2/{path}", 'Clockwork\Support\Laravel\ClockworkController@webV2Asset')
-				->where('path', '.+');
-		});
+		// v2 routes are now registered inside registerWebRoutes() to ensure
+		// they match before the catch-all {path} route
 	}
 
 	public function provides()
