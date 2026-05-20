@@ -82,6 +82,22 @@ class ClockworkController extends Controller
 		return new RedirectResponse('/' . $request->path() . '/app');
 	}
 
+	// V2 app index
+	public function webV2Index(ClockworkSupport $clockworkSupport)
+	{
+		$this->ensureClockworkIsEnabled($clockworkSupport);
+
+		return $clockworkSupport->getWebAsset('v2/index.html');
+	}
+
+	// V2 app assets serving
+	public function webV2Asset(ClockworkSupport $clockworkSupport, $path)
+	{
+		$this->ensureClockworkIsEnabled($clockworkSupport);
+
+		return $clockworkSupport->getWebAsset("v2/{$path}");
+	}
+
 	// Ensure Clockwork is still enabled at this point and stop Telescope recording if present
 	protected function ensureClockworkIsEnabled(ClockworkSupport $clockworkSupport)
 	{

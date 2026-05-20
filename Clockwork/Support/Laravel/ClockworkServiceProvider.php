@@ -43,6 +43,7 @@ class ClockworkServiceProvider extends ServiceProvider
 		// register the Clockwork Web UI routes
 		if ($this->app['clockwork.support']->isWebEnabled()) {
 			$this->registerWebRoutes();
+			$this->registerWebV2Routes();
 		}
 	}
 
@@ -300,6 +301,15 @@ class ClockworkServiceProvider extends ServiceProvider
 			$this->app['router']->get("{$path}", 'Clockwork\Support\Laravel\ClockworkController@webRedirect');
 			$this->app['router']->get("{$path}/app", 'Clockwork\Support\Laravel\ClockworkController@webIndex');
 			$this->app['router']->get("{$path}/{path}", 'Clockwork\Support\Laravel\ClockworkController@webAsset')
+				->where('path', '.+');
+		});
+	}
+
+	protected function registerWebV2Routes()
+	{
+		$this->app['clockwork.support']->webPaths()->each(function ($path) {
+			$this->app['router']->get("{$path}/v2/app", 'Clockwork\Support\Laravel\ClockworkController@webV2Index');
+			$this->app['router']->get("{$path}/v2/{path}", 'Clockwork\Support\Laravel\ClockworkController@webV2Asset')
 				->where('path', '.+');
 		});
 	}
