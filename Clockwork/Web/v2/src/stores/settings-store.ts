@@ -3,18 +3,22 @@ import type { ThemeMode } from '@/types/clockwork'
 
 const STORAGE_KEY = 'clockwork-settings'
 
+export type Locale = 'zh-CN' | 'en-US'
+
 interface SettingsState {
   theme: ThemeMode
   editor: string
   localPathMap: Record<string, string>
   metadataPath: string
   showContext: boolean
+  locale: Locale
 
   setTheme: (theme: ThemeMode) => void
   setEditor: (editor: string) => void
   setLocalPathMap: (map: Record<string, string>) => void
   setMetadataPath: (path: string) => void
   setShowContext: (value: boolean) => void
+  setLocale: (locale: Locale) => void
 }
 
 interface StoredSettings {
@@ -23,6 +27,7 @@ interface StoredSettings {
   localPathMap?: Record<string, string>
   metadataPath?: string
   showContext?: boolean
+  locale?: Locale
 }
 
 function loadSettings(): StoredSettings {
@@ -45,6 +50,7 @@ function persistState(state: SettingsState): void {
       localPathMap: state.localPathMap,
       metadataPath: state.metadataPath,
       showContext: state.showContext,
+      locale: state.locale,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   } catch {
@@ -60,9 +66,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   localPathMap: stored.localPathMap ?? {},
   metadataPath: stored.metadataPath ?? '',
   showContext: stored.showContext ?? true,
+  locale: stored.locale ?? 'zh-CN',
 
   setTheme: (theme) => {
     set({ theme })
+    persistState(get())
+  },
+
+  setLocale: (locale) => {
+    set({ locale })
     persistState(get())
   },
 

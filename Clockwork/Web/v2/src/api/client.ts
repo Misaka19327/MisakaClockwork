@@ -40,7 +40,7 @@ export class ClockworkClient {
     }
 
     if (filters) {
-      const filterKeys: (keyof SearchFilters)[] = [
+      const arrayFilterKeys: (keyof SearchFilters)[] = [
         'uri',
         'controller',
         'method',
@@ -50,9 +50,9 @@ export class ClockworkClient {
         'name',
         'type',
       ]
-      for (const key of filterKeys) {
+      for (const key of arrayFilterKeys) {
         const values = filters[key]
-        if (values && values.length > 0) {
+        if (Array.isArray(values) && values.length > 0) {
           for (const value of values) {
             params.append(key + '[]', value)
           }

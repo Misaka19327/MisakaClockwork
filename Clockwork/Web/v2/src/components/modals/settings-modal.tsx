@@ -2,23 +2,9 @@ import { useState, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/i18n'
+import { useSettingsStore, type Locale } from '@/stores/settings-store'
 import type { ThemeMode } from '@/types/clockwork'
-
-const SETTINGS_KEY = 'clockwork-settings'
-
-export interface ClockworkSettings {
-  theme: ThemeMode
-  editor: string
-  localPathMap: string
-  metadataPath: string
-}
-
-const defaultSettings: ClockworkSettings = {
-  theme: 'system',
-  editor: 'phpstorm',
-  localPathMap: '',
-  metadataPath: '',
-}
 
 const editors = [
   { value: 'vscode', label: 'VS Code' },
@@ -31,51 +17,52 @@ const editors = [
   { value: 'idea', label: 'IntelliJ IDEA' },
 ]
 
-export function loadSettings(): ClockworkSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY)
-    if (raw) {
-      return { ...defaultSettings, ...JSON.parse(raw) }
-    }
-  } catch {
-    // ignore
-  }
-  return { ...defaultSettings }
-}
-
-export function saveSettings(settings: ClockworkSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
-}
-
 interface SettingsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSettingsChange?: (settings: ClockworkSettings) => void
 }
 
-export function SettingsModal({ open, onOpenChange, onSettingsChange }: SettingsModalProps) {
-  const [settings, setSettings] = useState<ClockworkSettings>(loadSettings)
+export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
+  const { t } = useTranslation()
+  const theme = useSettingsStore((s) => s.theme)
+  const setTheme = useSettingsStore((s) => s.setTheme)
+  const editor = useSettingsStore((s) => s.editor)
+  const setEditor = useSettingsStore((s) => s.setEditor)
+  const localPathMap = useSettingsStore((s) => s.localPathMap)
+  const setLocalPathMap = useSettingsStore((s) => s.setLocalPathMap)
+  const metadataPath = useSettingsStore((s) => s.metadataPath)
+  const setMetadataPath = useSettingsStore((s) => s.setMetadataPath)
+  const locale = useSettingsStore((s) => s.locale)
+  const setLocale = useSettingsStore((s) => s.setLocale)
+
+  const [draftLocalPathMap, setDraftLocalPathMap] = useState('')
+  const [draftMetadataPath, setDraftMetadataPath] = useState('')
 
   useEffect(() => {
-    setSettings(loadSettings())
-  }, [open])
+    if (open) {
+      const entries = Object.entries(localPathMap)
+      setDraftLocalPathMap(
+        entries.length > 0
+          ? entries.map(([k, v]) => `${k} -> ${v}`).join('\n')
+          : '',
+      )
+      setDraftMetadataPath(metadataPath)
+    }
+  }, [open, localPathMap, metadataPath])
 
-  const updateSetting = <K extends keyof ClockworkSettings>(
-    key: K,
-    value: ClockworkSettings[K],
-  ) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const handleSave = () => {
-    saveSettings(settings)
-    onSettingsChange?.(settings)
-    onOpenChange(false)
-  }
-
-  const handleCancel = () => {
-    setSettings(loadSettings())
-    onOpenChange(false)
+  const handleSaveLocalPathMap = () => {
+    const map: Record<string, string> = {}
+    for (const line of draftLocalPathMap.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      const idx = trimmed.indexOf('->')
+      if (idx > 0) {
+        const remote = trimmed.slice(0, idx).trim()
+        const local = trimmed.slice(idx + 2).trim()
+        if (remote && local) map[remote] = local
+      }
+    }
+    setLocalPathMap(map)
   }
 
   return (
@@ -87,7 +74,7 @@ export function SettingsModal({ open, onOpenChange, onSettingsChange }: Settings
         >
           <Dialog.Title className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Settings className="h-5 w-5" />
-            Settings
+            {t('settings.title')}
           </Dialog.Title>
           <Dialog.Close asChild>
             <button
@@ -99,16 +86,47 @@ export function SettingsModal({ open, onOpenChange, onSettingsChange }: Settings
           </Dialog.Close>
 
           <div className="mt-4 space-y-5">
+            {/* Language */}
+            <section>
+              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.language')}</h3>
+              <div className="space-y-2">
+                {([
+                  { value: 'zh-CN' as Locale, labelKey: 'settings.lang.zhCN' as const },
+                  { value: 'en-US' as Locale, labelKey: 'settings.lang.enUS' as const },
+                ]).map(({ value, labelKey }) => (
+                  <label
+                    key={value}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+                      locale === value
+                        ? 'border-primary bg-primary/5 text-foreground'
+                        : 'border-border text-muted-foreground hover:border-primary/50',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="locale"
+                      value={value}
+                      checked={locale === value}
+                      onChange={() => setLocale(value)}
+                      className="accent-primary"
+                    />
+                    <span>{t(labelKey)}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
             {/* Appearance */}
             <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">Appearance</h3>
+              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.appearance')}</h3>
               <div className="space-y-2">
                 {(['light', 'dark', 'system'] as ThemeMode[]).map((mode) => (
                   <label
                     key={mode}
                     className={cn(
                       'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
-                      settings.theme === mode
+                      theme === mode
                         ? 'border-primary bg-primary/5 text-foreground'
                         : 'border-border text-muted-foreground hover:border-primary/50',
                     )}
@@ -117,14 +135,14 @@ export function SettingsModal({ open, onOpenChange, onSettingsChange }: Settings
                       type="radio"
                       name="theme"
                       value={mode}
-                      checked={settings.theme === mode}
-                      onChange={() => updateSetting('theme', mode)}
+                      checked={theme === mode}
+                      onChange={() => setTheme(mode)}
                       className="accent-primary"
                     />
                     <span className="capitalize">{mode}</span>
                     {mode === 'system' && (
                       <span className="text-xs text-muted-foreground">
-                        (follows OS setting)
+                        {t('settings.systemFollow')}
                       </span>
                     )}
                   </label>
@@ -134,15 +152,15 @@ export function SettingsModal({ open, onOpenChange, onSettingsChange }: Settings
 
             {/* Editor */}
             <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">Editor</h3>
+              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.editor')}</h3>
               <select
-                value={settings.editor}
-                onChange={(e) => updateSetting('editor', e.target.value)}
+                value={editor}
+                onChange={(e) => setEditor(e.target.value)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               >
-                {editors.map((editor) => (
-                  <option key={editor.value} value={editor.value}>
-                    {editor.label}
+                {editors.map((ed) => (
+                  <option key={ed.value} value={ed.value}>
+                    {ed.label}
                   </option>
                 ))}
               </select>
@@ -150,31 +168,33 @@ export function SettingsModal({ open, onOpenChange, onSettingsChange }: Settings
 
             {/* Local Path Mapping */}
             <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">Local Path Mapping</h3>
-              <input
-                type="text"
-                value={settings.localPathMap}
-                onChange={(e) => updateSetting('localPathMap', e.target.value)}
+              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.localPathMapping')}</h3>
+              <textarea
+                value={draftLocalPathMap}
+                onChange={(e) => setDraftLocalPathMap(e.target.value)}
+                onBlur={handleSaveLocalPathMap}
                 placeholder="/remote/path -> /local/path"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono outline-none focus:border-ring focus:ring-1 focus:ring-ring resize-none"
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Map remote paths to local paths for file links
+                {t('settings.localPathMappingDesc')}
               </p>
             </section>
 
             {/* Metadata Path */}
             <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">Metadata Path</h3>
+              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.metadataPath')}</h3>
               <input
                 type="text"
-                value={settings.metadataPath}
-                onChange={(e) => updateSetting('metadataPath', e.target.value)}
+                value={draftMetadataPath}
+                onChange={(e) => setDraftMetadataPath(e.target.value)}
+                onBlur={() => setMetadataPath(draftMetadataPath)}
                 placeholder="/path/to/clockwork/metadata"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Path to Clockwork metadata storage directory
+                {t('settings.metadataPathDesc')}
               </p>
             </section>
           </div>
@@ -183,17 +203,17 @@ export function SettingsModal({ open, onOpenChange, onSettingsChange }: Settings
           <div className="mt-6 flex justify-end gap-2">
             <button
               type="button"
-              onClick={handleCancel}
+              onClick={() => onOpenChange(false)}
               className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
-              Cancel
+              {t('settings.cancel')}
             </button>
             <button
               type="button"
-              onClick={handleSave}
+              onClick={() => onOpenChange(false)}
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Save
+              {t('settings.save')}
             </button>
           </div>
         </Dialog.Content>

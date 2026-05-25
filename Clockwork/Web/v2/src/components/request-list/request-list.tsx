@@ -2,10 +2,10 @@ import { useRef, useCallback, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { cn } from '@/lib/utils'
 import { Loader2, ArrowDown } from 'lucide-react'
-import { ClockworkClient } from '@/api/client'
+import { useTranslation } from '@/i18n'
 import type { ClockworkRequest, SearchFilters } from '@/types/clockwork'
 import { RequestRow } from './request-row'
-import { SearchBar } from './search-bar'
+import { FilterBar } from './filter-bar'
 import { FilterTags } from './filter-tags'
 
 interface RequestListProps {
@@ -17,6 +17,7 @@ interface RequestListProps {
   hasMore: boolean
   filters: SearchFilters
   onFiltersChange: (filters: SearchFilters) => void
+  compact?: boolean
   className?: string
 }
 
@@ -29,19 +30,22 @@ export function RequestList({
   hasMore,
   filters,
   onFiltersChange,
+  compact = false,
   className,
 }: RequestListProps) {
+  const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const previousCountRef = useRef(requests.length)
+
+  const rowHeight = compact ? 40 : 36
 
   const virtualizer = useVirtualizer({
     count: hasMore ? requests.length + 1 : requests.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 34,
+    estimateSize: () => rowHeight,
     overscan: 20,
   })
 
-  // Auto-scroll to bottom when new requests arrive
   useEffect(() => {
     if (requests.length > previousCountRef.current && parentRef.current) {
       const isNearBottom =
@@ -61,11 +65,28 @@ export function RequestList({
 
   return (
     <div className={cn('flex h-full flex-col border-r border-border bg-sidebar-background', className)}>
-      {/* Header */}
-      <div className="shrink-0 space-y-1.5 border-b border-border p-2">
-        <SearchBar filters={filters} onFiltersChange={onFiltersChange} />
-        <FilterTags filters={filters} onFiltersChange={onFiltersChange} />
+      {/* Header: Filter area */}
+      <div className="shrink-0 border-b border-border p-2 space-y-1.5">
+        {!compact ? (
+          <FilterBar filters={filters} onFiltersChange={onFiltersChange} />
+        ) : (
+          <FilterTags filters={filters} compact />
+        )}
       </div>
+
+      {/* Column headers (expanded mode only) */}
+      {!compact && (
+        <div className="shrink-0 flex items-center gap-3 border-b border-border px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+          <span className="w-16 text-center">{t('column.type')}</span>
+          <span className="w-12 text-right">{t('column.status')}</span>
+          <span className="w-20">{t('column.duration')}</span>
+          <span className="w-16">{t('column.memory')}</span>
+          <span className="w-36">{t('column.time')}</span>
+          <span className="flex-1">{t('column.path')}</span>
+          <span className="w-16">{t('column.method')}</span>
+          <span className="w-60">{t('column.handler')}</span>
+        </div>
+      )}
 
       {/* Virtual list */}
       <div ref={parentRef} className="flex-1 overflow-auto">
@@ -94,7 +115,7 @@ export function RequestList({
                   {isLoading ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading...
+                      {t('footer.loading')}
                     </div>
                   ) : hasMore ? (
                     <button
@@ -103,7 +124,7 @@ export function RequestList({
                       className="flex items-center gap-1.5 rounded px-3 py-1 text-sm text-primary hover:bg-muted"
                     >
                       <ArrowDown className="h-3.5 w-3.5" />
-                      Load older requests
+                      {t('footer.loadOlder')}
                     </button>
                   ) : null}
                 </div>
@@ -127,6 +148,7 @@ export function RequestList({
                   request={request}
                   isSelected={selectedId === request.id}
                   onClick={() => onSelectRequest(request)}
+                  compact={compact}
                 />
               </div>
             )
@@ -136,7 +158,7 @@ export function RequestList({
 
       {/* Footer count */}
       <div className="shrink-0 border-t border-border px-3 py-1 text-xs text-muted-foreground">
-        {requests.length} request{requests.length !== 1 ? 's' : ''}
+        {t('footer.requests', { count: requests.length }).replace('{count}', String(requests.length))}
       </div>
     </div>
   )

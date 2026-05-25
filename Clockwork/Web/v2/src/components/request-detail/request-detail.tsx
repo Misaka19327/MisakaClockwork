@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { formatDuration, formatMemory } from '@/utils/format'
 import type { ClockworkRequest } from '@/types/clockwork'
-import { Copy } from 'lucide-react'
+import { Copy, X } from 'lucide-react'
+import { useRequestStore } from '@/stores/request-store'
 import { MethodBadge } from './shared/method-badge'
 import { StatusBadge } from './shared/status-badge'
 import { TabBar, type TabDef } from './tab-bar'
@@ -27,6 +28,7 @@ interface RequestDetailProps {
 
 export function RequestDetail({ request, className }: RequestDetailProps) {
   const [activeTab, setActiveTab] = useState('request')
+  const selectRequest = useRequestStore((s) => s.selectRequest)
 
   const tabs = useMemo(() => {
     if (!request) return []
@@ -131,6 +133,14 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
             {formatMemory(request.memoryUsage)}
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => selectRequest(null)}
+          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          title="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       {/* UUID row */}

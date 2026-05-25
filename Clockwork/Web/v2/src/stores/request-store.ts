@@ -1,13 +1,26 @@
 import { create } from 'zustand'
 import type { ClockworkRequest, SearchFilters } from '@/types/clockwork'
 
+function toLocalDatetimeInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function getDefaultTimeRange(): { timeStart: string; timeEnd: string } {
+  const now = new Date()
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+  return {
+    timeStart: toLocalDatetimeInput(oneHourAgo),
+    timeEnd: toLocalDatetimeInput(now),
+  }
+}
+
 interface RequestStore {
   requests: ClockworkRequest[]
   selectedId: string | null
   oldestId: string | null
   searchFilters: SearchFilters
   preserveLog: boolean
-  collapsed: boolean
   showIncomingRequests: boolean
 
   selectRequest: (id: string | null) => void
@@ -17,7 +30,6 @@ interface RequestStore {
   clearRequests: () => void
   setSearchFilters: (filters: SearchFilters) => void
   setPreserveLog: (value: boolean) => void
-  setCollapsed: (value: boolean) => void
   setShowIncomingRequests: (value: boolean) => void
   getSelectedRequest: () => ClockworkRequest | undefined
 }
@@ -26,9 +38,8 @@ export const useRequestStore = create<RequestStore>((set, get) => ({
   requests: [],
   selectedId: null,
   oldestId: null,
-  searchFilters: {},
+  searchFilters: getDefaultTimeRange(),
   preserveLog: false,
-  collapsed: false,
   showIncomingRequests: true,
 
   selectRequest: (id) => set({ selectedId: id }),
@@ -61,8 +72,6 @@ export const useRequestStore = create<RequestStore>((set, get) => ({
   setSearchFilters: (filters) => set({ searchFilters: filters }),
 
   setPreserveLog: (value) => set({ preserveLog: value }),
-
-  setCollapsed: (value) => set({ collapsed: value }),
 
   setShowIncomingRequests: (value) => set({ showIncomingRequests: value }),
 

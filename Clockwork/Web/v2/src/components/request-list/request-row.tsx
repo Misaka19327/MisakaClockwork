@@ -1,11 +1,13 @@
 import { cn } from '@/lib/utils'
-import { formatDuration, formatTime, truncate } from '@/utils/format'
+import { formatDuration, formatMemory, formatDateTime, formatDateOnly, formatTimeOnly, truncate } from '@/utils/format'
 import type { ClockworkRequest } from '@/types/clockwork'
+import { AlertTriangle } from 'lucide-react'
 
 interface RequestRowProps {
   request: ClockworkRequest
   isSelected: boolean
   onClick: () => void
+  compact?: boolean
   className?: string
 }
 
@@ -36,83 +38,248 @@ const typeBadgeLabels: Record<string, string> = {
   test: 'TEST',
 }
 
-export function RequestRow({ request, isSelected, onClick, className }: RequestRowProps) {
+function getTypeBadge(request: ClockworkRequest) {
+  if (request.type === 'request') {
+    const method = request.method?.toUpperCase() ?? ''
+    if (method && methodStyles[method]) {
+      return { label: method, style: methodStyles[method] }
+    }
+    return { label: 'REQ', style: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' }
+  }
+  return {
+    label: typeBadgeLabels[request.type] ?? request.type.toUpperCase(),
+    style: typeBadgeStyles[request.type] ?? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+  }
+}
+
+function getStatusDisplay(request: ClockworkRequest) {
+  if (request.type === 'request') {
+    if (request.responseStatus != null) {
+      const group = String(Math.floor(request.responseStatus / 100))
+      return {
+        text: String(request.responseStatus),
+        style: statusStyles[group] ?? 'text-muted-foreground',
+        hasError: request.responseStatus >= 500,
+      }
+    }
+    return null
+  }
+
+  if (request.type === 'command') {
+    if (request.commandExitCode != null) {
+      return {
+        text: String(request.commandExitCode),
+        style: request.commandExitCode === 0
+          ? 'text-emerald-600 dark:text-emerald-400'
+          : 'text-red-600 dark:text-red-400',
+        hasError: request.commandExitCode !== 0,
+      }
+    }
+    return null
+  }
+
+  if (request.type === 'queue-job') {
+    if (request.jobStatus) {
+      const isFailed = request.jobStatus === 'failed'
+      return {
+        text: request.jobStatus,
+        style: isFailed
+          ? 'text-red-600 dark:text-red-400'
+          : 'text-emerald-600 dark:text-emerald-400',
+        hasError: isFailed,
+      }
+    }
+    return null
+  }
+
+  if (request.type === 'test') {
+    if (request.testStatus) {
+      const isFailed = request.testStatus === 'failed' || request.testStatus === 'error'
+      return {
+        text: request.testStatus,
+        style: isFailed
+          ? 'text-red-600 dark:text-red-400'
+          : 'text-emerald-600 dark:text-emerald-400',
+        hasError: isFailed,
+      }
+    }
+    return null
+  }
+
+  return null
+}
+
+function getHandlerName(request: ClockworkRequest): string {
+  if (request.controller) return truncate(request.controller.split('@')[0].split('\\').pop() ?? request.controller, 30)
+  if (request.commandName) return truncate(request.commandName, 30)
+  if (request.jobName) return truncate(request.jobName, 30)
+  if (request.testName) return truncate(request.testName, 30)
+  return request.id
+}
+
+function getPath(request: ClockworkRequest): string {
+  if (request.type === 'request') {
+    return request.uri ?? request.url ?? ''
+  }
+  if (request.type === 'command') {
+    if (request.commandName && request.commandArguments) {
+      const args = Object.entries(request.commandArguments)
+        .map(([k, v]) => `--${k}=${String(v)}`)
+        .join(' ')
+      return `${request.commandName} ${args}`
+    }
+    return request.commandName ?? ''
+  }
+  if (request.type === 'queue-job') {
+    return request.jobDescription ?? request.jobName ?? ''
+  }
+  if (request.type === 'test') {
+    return request.testName ?? ''
+  }
+  return ''
+}
+
+function hasException(request: ClockworkRequest): boolean {
+  if (request.responseStatus != null && request.responseStatus >= 500) return true
+  if (request.log?.some((l) => l.exception)) return true
+  if (request.type === 'command' && request.commandExitCode != null && request.commandExitCode !== 0) return true
+  return false
+}
+
+export function RequestRow({ request, isSelected, onClick, compact = false, className }: RequestRowProps) {
+  const typeBadge = getTypeBadge(request)
+  const status = getStatusDisplay(request)
+  const handler = getHandlerName(request)
+  const path = getPath(request)
+  const hasError = hasException(request)
   const isHttpRequest = request.type === 'request'
-  const method = request.method?.toUpperCase() ?? ''
 
-  const displayLabel = (() => {
-    if (request.controller) return truncate(request.controller.split('@')[0].split('\\').pop() ?? request.controller, 30)
-    if (request.uri) return truncate(request.uri, 40)
-    if (request.commandName) return truncate(request.commandName, 30)
-    if (request.jobName) return truncate(request.jobName, 30)
-    if (request.testName) return truncate(request.testName, 30)
-    return request.id
-  })()
+  if (compact) {
+    return (
+      <div
+        onClick={onClick}
+        className={cn(
+          'flex cursor-pointer items-center gap-2 border-b border-border/50 px-2 py-1.5 text-sm transition-colors last:border-0',
+          isSelected
+            ? 'bg-primary/10 border-l-2 border-l-primary'
+            : 'hover:bg-muted/50 border-l-2 border-l-transparent',
+          className,
+        )}
+      >
+        {/* Type badge */}
+        <span
+          className={cn(
+            'shrink-0 rounded px-1 py-0.5 text-[10px] font-bold',
+            typeBadge.style,
+          )}
+        >
+          {typeBadge.label}
+        </span>
 
-  const statusGroup = request.responseStatus
-    ? String(Math.floor(request.responseStatus / 100))
-    : ''
+        {/* Status */}
+        {status && (
+          <span
+            className={cn(
+              'shrink-0 text-xs font-semibold tabular-nums',
+              status.style,
+            )}
+          >
+            {status.text}
+          </span>
+        )}
 
+        {/* Error indicator */}
+        {hasError && !status?.hasError && (
+          <AlertTriangle className="h-3 w-3 shrink-0 text-red-500" />
+        )}
+
+        {/* Handler name */}
+        <span className="flex-1 truncate text-foreground text-xs">{handler}</span>
+
+        {/* Time - two lines: date on top, time on bottom */}
+        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground text-right leading-tight">
+          <span className="block">{formatDateOnly(request.time)}</span>
+          <span className="block">{formatTimeOnly(request.time)}</span>
+        </span>
+      </div>
+    )
+  }
+
+  // Expanded mode - table row with all columns
   return (
     <div
       onClick={onClick}
       className={cn(
-        'flex cursor-pointer items-center gap-2 border-b border-border/50 px-3 py-1.5 text-sm transition-colors last:border-0',
+        'flex cursor-pointer items-center gap-3 border-b border-border/50 px-3 py-1.5 text-sm transition-colors last:border-0',
         isSelected
           ? 'bg-primary/10 border-l-2 border-l-primary'
           : 'hover:bg-muted/50 border-l-2 border-l-transparent',
         className,
       )}
     >
-      {/* Type badge for non-HTTP requests */}
-      {request.type !== 'request' && (
-        <span
-          className={cn(
-            'shrink-0 rounded px-1 py-0.5 text-[10px] font-bold',
-            typeBadgeStyles[request.type] ?? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-          )}
-        >
-          {typeBadgeLabels[request.type] ?? request.type.toUpperCase()}
-        </span>
-      )}
-
-      {/* Method badge */}
-      {method && isHttpRequest && (
-        <span
-          className={cn(
-            'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold',
-            methodStyles[method] ?? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-          )}
-        >
-          {method}
-        </span>
-      )}
-
-      {/* Label */}
-      <span className="flex-1 truncate text-foreground">{displayLabel}</span>
+      {/* Type */}
+      <span
+        className={cn(
+          'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold w-16 text-center',
+          typeBadge.style,
+        )}
+      >
+        {typeBadge.label}
+      </span>
 
       {/* Status */}
-      {request.responseStatus != null && (
-        <span
-          className={cn(
-            'shrink-0 text-xs font-semibold tabular-nums',
-            statusStyles[statusGroup] ?? 'text-muted-foreground',
-          )}
-        >
-          {request.responseStatus}
-        </span>
-      )}
+      <span className="shrink-0 w-12 text-right">
+        {status ? (
+          <span className={cn('text-xs font-semibold tabular-nums', status.style)}>
+            {status.text}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
+        {hasError && !status?.hasError && (
+          <AlertTriangle className="inline ml-0.5 h-3 w-3 text-red-500" />
+        )}
+      </span>
 
       {/* Duration */}
-      {request.responseDuration != null && (
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {formatDuration(request.responseDuration)}
-        </span>
-      )}
+      <span className="shrink-0 w-20 text-xs tabular-nums text-muted-foreground">
+        {request.responseDuration != null ? formatDuration(request.responseDuration) : '-'}
+      </span>
+
+      {/* Memory */}
+      <span className="shrink-0 w-16 text-xs tabular-nums text-muted-foreground">
+        {request.memoryUsage != null ? formatMemory(request.memoryUsage) : '-'}
+      </span>
 
       {/* Time */}
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-        {formatTime(request.time)}
+      <span className="shrink-0 w-36 text-xs tabular-nums text-muted-foreground">
+        {formatDateTime(request.time)}
+      </span>
+
+      {/* Path */}
+      <span className="flex-1 truncate text-xs text-foreground/80" title={path}>
+        {path || '-'}
+      </span>
+
+      {/* Method (HTTP only) */}
+      <span className="shrink-0 w-16 text-left">
+        {isHttpRequest && request.method ? (
+          <span
+            className={cn(
+              'inline-block rounded px-1.5 py-0.5 text-[10px] font-bold',
+              methodStyles[request.method.toUpperCase()] ?? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+            )}
+          >
+            {request.method.toUpperCase()}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
+      </span>
+
+      {/* Handler */}
+      <span className="shrink-0 w-60 truncate text-xs font-medium text-foreground" title={handler}>
+        {handler}
       </span>
     </div>
   )

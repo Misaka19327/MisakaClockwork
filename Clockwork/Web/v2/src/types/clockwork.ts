@@ -243,14 +243,18 @@ export interface ClockworkRequest {
 }
 
 export interface SearchFilters {
+  search?: string
   uri?: string[]
   controller?: string[]
   method?: string[]
   status?: string[]
-  time?: string[]
-  received?: string[]
-  name?: string[]
+  durationRange?: string
+  timeStart?: string
+  timeEnd?: string
   type?: string[]
+  name?: string[]
+  received?: string[]
+  time?: string[]
 }
 
 export interface EventDetails {
