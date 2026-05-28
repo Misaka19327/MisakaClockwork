@@ -14,6 +14,7 @@ class Search
 	public $received = [];
 	public $name = [];
 	public $type = [];
+	public $search = '';
 
 	// Whether to stop search on the first not matching request
 	public $stopOnFirstMismatch = false;
@@ -24,6 +25,8 @@ class Search
 		foreach ([ 'uri', 'controller', 'method', 'status', 'time', 'received', 'name', 'type' ] as $condition) {
 			$this->$condition = $search[$condition] ?? [];
 		}
+
+		$this->search = isset($search['search']) ? (string) $search['search'] : '';
 
 		foreach ([ 'stopOnFirstMismatch' ] as $option) {
 			$this->$option = $options[$option] ?? $this->$option;
@@ -61,7 +64,8 @@ class Search
 			&& $this->matchesExact($this->method, strtolower($request->method))
 			&& $this->matchesNumber($this->status, $request->responseStatus)
 			&& $this->matchesNumber($this->time, $request->responseDuration)
-			&& $this->matchesDate($this->received, $request->time);
+			&& $this->matchesDate($this->received, $request->time)
+			&& $this->matchesSearch([ $request->uri, $request->controller ]);
 	}
 
 	// Check whether a command type request matches
@@ -71,7 +75,8 @@ class Search
 			&& $this->matchesString($this->name, $request->commandName)
 			&& $this->matchesNumber($this->status, $request->commandExitCode)
 			&& $this->matchesNumber($this->time, $request->responseDuration)
-			&& $this->matchesDate($this->received, $request->time);
+			&& $this->matchesDate($this->received, $request->time)
+			&& $this->matchesSearch([ $request->commandName ]);
 	}
 
 	// Check whether a queue-job type request matches
@@ -81,7 +86,8 @@ class Search
 			&& $this->matchesString($this->name, $request->jobName)
 			&& $this->matchesString($this->status, $request->jobStatus)
 			&& $this->matchesNumber($this->time, $request->responseDuration)
-			&& $this->matchesDate($this->received, $request->time);
+			&& $this->matchesDate($this->received, $request->time)
+			&& $this->matchesSearch([ $request->jobName, $request->jobDescription ]);
 	}
 
 	// Check whether a test type request matches
@@ -91,14 +97,16 @@ class Search
 			&& $this->matchesString($this->name, $request->testName)
 			&& $this->matchesString($this->status, $request->testStatus)
 			&& $this->matchesNumber($this->time, $request->responseDuration)
-			&& $this->matchesDate($this->received, $request->time);
+			&& $this->matchesDate($this->received, $request->time)
+			&& $this->matchesSearch([ $request->testName ]);
 	}
 
 	// Check if there are no search parameters specified
 	public function isEmpty()
 	{
 		return ! count($this->uri) && ! count($this->controller) && ! count($this->method) && ! count($this->status)
-			&& ! count($this->time) && ! count($this->received) && ! count($this->name) && ! count($this->type);
+			&& ! count($this->time) && ! count($this->received) && ! count($this->name) && ! count($this->type)
+			&& $this->search === '';
 	}
 
 	// Check if there are some search parameters specified
@@ -158,6 +166,18 @@ class Search
 
 		foreach ($inputs as $input) {
 			if (strpos($value, $input) !== false) return true;
+		}
+
+		return false;
+	}
+
+	// Check if any of the given values contain the search term (case-insensitive)
+	protected function matchesSearch($fields)
+	{
+		if ($this->search === '') return true;
+
+		foreach ($fields as $value) {
+			if ($value !== null && $value !== '' && stripos($value, $this->search) !== false) return true;
 		}
 
 		return false;

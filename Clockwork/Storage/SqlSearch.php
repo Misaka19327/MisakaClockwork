@@ -57,7 +57,8 @@ class SqlSearch extends Search
 			$this->resolveExactCondition('method', $this->method),
 			$this->resolveNumberCondition([ 'responseStatus', 'commandExitCode', 'jobStatus', 'testStatus' ], $this->status),
 			$this->resolveNumberCondition([ 'responseDuration' ], $this->time),
-			$this->resolveDateCondition([ 'time' ], $this->received)
+			$this->resolveDateCondition([ 'time' ], $this->received),
+			$this->resolveSearchCondition()
 		]);
 
 		$sql = array_map(function ($condition) { return $condition[0]; }, $conditions);
@@ -152,6 +153,24 @@ class SqlSearch extends Search
 	protected function buildQuery()
 	{
 		$this->query = count($this->conditions) ? 'WHERE ' . implode(' AND ', $this->conditions) : '';
+	}
+
+	// Resolve a free-text search condition — matches against uri, controller, commandName, jobName, testName, jobDescription
+	protected function resolveSearchCondition()
+	{
+		if ($this->search === '') return null;
+
+		$fields = [ 'uri', 'controller', 'commandName', 'jobName', 'testName', 'jobDescription' ];
+		$bindings = [];
+		$escaped = str_replace([ '!', '%', '_' ], [ '!!', '!%', '!_'], $this->search);
+
+		$conditions = implode(' OR ', array_map(function ($field) use (&$bindings, $escaped) {
+			$key = "search_{$field}";
+			$bindings[$key] = "%{$escaped}%";
+			return $this->quote($field) . " LIKE :{$key} ESCAPE '!'";
+		}, $fields));
+
+		return [ "({$conditions})", $bindings ];
 	}
 
 	// Quotes SQL identifier name properly for the current database

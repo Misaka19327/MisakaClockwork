@@ -8,19 +8,26 @@ export function useRequestList(filters: SearchFilters) {
   const setRequests = useRequestStore((s) => s.setRequests)
   const prependRequests = useRequestStore((s) => s.prependRequests)
   const requests = useRequestStore((s) => s.requests)
-  const searchFilters = useRequestStore((s) => s.searchFilters)
   const [initialized, setInitialized] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Bootstrap: load latest + one page of older
+  // Stable key derived from filters content — avoids spurious re-runs on new object identity
+  const filtersKey = JSON.stringify(filters)
+
+  // Bootstrap: load latest + one page of older. Re-runs when filters change.
   useEffect(() => {
     let cancelled = false
 
+    // Clear stale data immediately when filters change
+    setRequests([])
+    setInitialized(false)
+
     async function bootstrap() {
       try {
-        const latest = await client.fetchLatest()
+        const latest = await client.fetchLatest(filters)
         if (cancelled || !latest) {
           if (!cancelled) setRequests([])
+          if (!cancelled) setInitialized(true)
           return
         }
 
@@ -37,13 +44,14 @@ export function useRequestList(filters: SearchFilters) {
         setInitialized(true)
       } catch (e) {
         console.error('[Clockwork] Failed to bootstrap request list:', e)
+        if (!cancelled) setInitialized(true)
       }
     }
 
     bootstrap()
 
     return () => { cancelled = true }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filtersKey]) // Re-run on filter change
 
   // Poll for new requests every 1 second
   useEffect(() => {
@@ -53,7 +61,7 @@ export function useRequestList(filters: SearchFilters) {
       if (requests.length === 0) return
       try {
         const newest = requests[0]
-        const newReqs = await client.fetchNext(newest.id, 50, searchFilters)
+        const newReqs = await client.fetchNext(newest.id, 50, filters)
         if (newReqs.length > 0) {
           prependRequests(newReqs)
         }
@@ -65,7 +73,7 @@ export function useRequestList(filters: SearchFilters) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [initialized, requests.length, searchFilters, prependRequests])
+  }, [initialized, requests.length, filtersKey, prependRequests])
 
   return { isLoading: !initialized }
 }

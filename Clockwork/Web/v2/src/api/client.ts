@@ -40,6 +40,12 @@ export class ClockworkClient {
     }
 
     if (filters) {
+      // Free-text search
+      if (filters.search) {
+        params.set('search', filters.search)
+      }
+
+      // Array-type filters (direct passthrough)
       const arrayFilterKeys: (keyof SearchFilters)[] = [
         'uri',
         'controller',
@@ -56,6 +62,37 @@ export class ClockworkClient {
           for (const value of values) {
             params.append(key + '[]', value)
           }
+        }
+      }
+
+      // Time range → received[] (backend uses >timestamp / <timestamp format)
+      if (filters.timeStart) {
+        const d = new Date(filters.timeStart)
+        if (!isNaN(d.getTime())) {
+          const ts = Math.floor(d.getTime() / 1000)
+          params.append('received[]', `>${ts}`)
+        }
+      }
+      if (filters.timeEnd) {
+        const d = new Date(filters.timeEnd)
+        if (!isNaN(d.getTime())) {
+          const ts = Math.floor(d.getTime() / 1000)
+          params.append('received[]', `<${ts}`)
+        }
+      }
+
+      // Duration range → time[] (backend uses milliseconds)
+      if (filters.durationRange) {
+        switch (filters.durationRange) {
+          case 'fast':
+            params.append('time[]', '<100')
+            break
+          case 'normal':
+            params.append('time[]', '100-1000')
+            break
+          case 'slow':
+            params.append('time[]', '>1000')
+            break
         }
       }
     }
@@ -111,9 +148,12 @@ export class ClockworkClient {
     return this.request<ClockworkRequest>(path)
   }
 
-  async fetchLatest(): Promise<ClockworkRequest | null> {
+  async fetchLatest(filters?: SearchFilters): Promise<ClockworkRequest | null> {
     try {
-      return await this.request<ClockworkRequest>('latest')
+      const params = this.buildQueryParams(filters)
+      const query = params.toString()
+      const path = `latest${query ? '?' + query : ''}`
+      return await this.request<ClockworkRequest>(path)
     } catch (error) {
       if ((error as Error).message === 'NOT_FOUND') {
         return null
