@@ -51,7 +51,7 @@ export function DataTable<T extends Record<string, any>>({
     <div className={cn('overflow-x-auto', className)}>
       <table className="w-full border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-border bg-muted/50">
+          <tr className="border-b border-border/50 bg-muted/30">
             {columns.map((col) => (
               <th
                 key={col.key}
@@ -99,7 +99,7 @@ export function DataTable<T extends Record<string, any>>({
                 onClick={onRowClick ? () => onRowClick(row, i) : undefined}
                 className={cn(
                   'border-b border-border/50 transition-colors last:border-0',
-                  onRowClick && 'cursor-pointer hover:bg-muted/50',
+                  onRowClick && 'cursor-pointer hover:bg-accent/50',
                 )}
               >
                 {columns.map((col) => (

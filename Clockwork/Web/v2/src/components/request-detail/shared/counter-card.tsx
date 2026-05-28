@@ -16,8 +16,8 @@ export function CounterCard({ label, value, icon, className, onClick }: CounterC
       onClick={onClick}
       disabled={!onClick}
       className={cn(
-        'flex flex-col items-center justify-center rounded-lg border border-border bg-card p-3 text-center transition-colors',
-        onClick && 'cursor-pointer hover:bg-accent',
+        'flex flex-col items-center justify-center rounded-lg border border-border/50 bg-card/50 p-3 text-center transition-colors duration-150',
+        onClick && 'cursor-pointer hover:bg-accent/60',
         !onClick && 'cursor-default',
         className,
       )}

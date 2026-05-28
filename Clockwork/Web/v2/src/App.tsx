@@ -44,15 +44,15 @@ function LayoutInner({ expanded }: { expanded: boolean }) {
 
   return (
     <I18nProvider locale={locale}>
-      <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
+      <div className="h-screen w-full flex flex-col overflow-hidden bg-background text-foreground">
         {/* Top bar */}
-        <div className="shrink-0 flex items-center border-b border-border px-4 h-9">
-          <span className="text-sm font-semibold tracking-tight">MisakaClockWork</span>
+        <div className="shrink-0 flex items-center border-b border-border/70 px-4 h-10 bg-sidebar-background/50">
+          <span className="text-[13px] font-semibold tracking-tight text-foreground/90">MisakaClockWork</span>
           <div className="flex-1" />
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-150"
           >
             <Settings className="h-4 w-4" />
           </button>
@@ -93,12 +93,15 @@ function LeftPanel({ expanded }: { expanded: boolean }) {
       filters={searchFilters}
       onFiltersChange={setSearchFilters}
       compact={!expanded}
+      expanded={expanded}
     />
   )
 }
 
 function RightPanel() {
-  const selectedRequest = useRequestStore((s) => s.getSelectedRequest())
+  const selectedId = useRequestStore((s) => s.selectedId)
+  const requests = useRequestStore((s) => s.requests)
+  const selectedRequest = selectedId ? requests.find((r) => r.id === selectedId) ?? null : null
 
-  return <RequestDetail request={selectedRequest ?? null} />
+  return <RequestDetail request={selectedRequest} />
 }

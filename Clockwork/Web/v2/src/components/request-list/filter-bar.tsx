@@ -47,7 +47,7 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
     <div className={cn('space-y-1.5', className)}>
       <div className="flex items-center gap-1.5">
         {/* Search input */}
-        <div className="flex items-center gap-1.5 flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
+        <div className="flex items-center gap-1.5 flex-1 rounded-md border border-input/80 bg-background px-2.5 py-1 text-sm focus-within:border-ring/60 focus-within:ring-1 focus-within:ring-ring/30 transition-colors duration-150">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
             type="text"
@@ -115,15 +115,15 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
           type="datetime-local"
           value={filters.timeStart ?? ''}
           onChange={(e) => updateFilter('timeStart', e.target.value || undefined)}
-          className="shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring cursor-pointer"
+          className="shrink-0 rounded-md border border-input/80 bg-background px-2 py-1.5 text-sm min-w-[140px] outline-none focus:border-ring/60 focus:ring-1 focus:ring-ring/30 cursor-pointer transition-colors duration-150"
           title={t('filter.timeStart')}
         />
-        <span className="text-xs text-muted-foreground">~</span>
+        <span className="text-sm text-muted-foreground shrink-0">~</span>
         <input
           type="datetime-local"
           value={filters.timeEnd ?? ''}
           onChange={(e) => updateFilter('timeEnd', e.target.value || undefined)}
-          className="shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring cursor-pointer"
+          className="shrink-0 rounded-md border border-input/80 bg-background px-2 py-1.5 text-sm min-w-[140px] outline-none focus:border-ring/60 focus:ring-1 focus:ring-ring/30 cursor-pointer transition-colors duration-150"
           title={t('filter.timeEnd')}
         />
 
@@ -157,7 +157,7 @@ function FilterSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring cursor-pointer"
+      className="shrink-0 rounded-md border border-input/80 bg-background px-2 py-1 text-xs outline-none focus:border-ring/60 focus:ring-1 focus:ring-ring/30 cursor-pointer transition-colors duration-150"
     >
       <option value="">{placeholder}</option>
       {options.map((opt) => (

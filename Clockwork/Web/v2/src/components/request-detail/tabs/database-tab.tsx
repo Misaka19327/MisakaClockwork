@@ -138,7 +138,7 @@ export function DatabaseTab({ queries, slowThreshold = 100, className }: Databas
   return (
     <div className={cn('flex flex-col', className)}>
       {/* Header with search */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-4 py-2">
         <span className="text-xs text-muted-foreground">
           {queries.length} quer{queries.length !== 1 ? 'ies' : 'y'}
           {filteredQueries.length !== queries.length && ` (showing ${filteredQueries.length})`}

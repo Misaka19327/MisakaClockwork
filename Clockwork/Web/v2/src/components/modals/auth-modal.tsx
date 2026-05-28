@@ -35,9 +35,9 @@ export function AuthModal({ open, onAuthenticate, onClose }: AuthModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose?.()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-background p-6 shadow-lg"
+          className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border/60 bg-card p-6 shadow-xl"
         >
           <Dialog.Title className="text-lg font-semibold text-foreground">
             Authentication Required
@@ -69,7 +69,7 @@ export function AuthModal({ open, onAuthenticate, onClose }: AuthModalProps) {
                 onChange={(e) => setUsername(e.target.value)}
                 autoFocus
                 required
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                className="w-full rounded-md border border-input/80 bg-background px-3 py-2 text-sm outline-none focus:border-ring/60 focus:ring-1 focus:ring-ring/30 transition-colors duration-150"
                 placeholder="Username"
               />
             </div>
@@ -87,7 +87,7 @@ export function AuthModal({ open, onAuthenticate, onClose }: AuthModalProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                className="w-full rounded-md border border-input/80 bg-background px-3 py-2 text-sm outline-none focus:border-ring/60 focus:ring-1 focus:ring-ring/30 transition-colors duration-150"
                 placeholder="Password"
               />
             </div>

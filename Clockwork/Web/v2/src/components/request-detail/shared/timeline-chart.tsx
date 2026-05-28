@@ -137,7 +137,7 @@ export function TimelineChart({ events, className, minDuration = 0 }: TimelineCh
       </div>
       <div
         ref={containerRef}
-        className="relative h-auto select-none overflow-hidden rounded border border-border bg-card"
+        className="relative h-auto select-none overflow-hidden rounded border border-border/50 bg-card/50"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

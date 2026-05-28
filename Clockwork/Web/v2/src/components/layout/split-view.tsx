@@ -104,11 +104,11 @@ export function SplitView({
       {!expanded && (
         <div
           className={cn(
-            'shrink-0 w-[1px] bg-border cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors relative group',
+            'shrink-0 w-px bg-border/60 cursor-col-resize hover:bg-primary/40 active:bg-primary transition-colors duration-150 relative group',
           )}
           onMouseDown={handleMouseDown}
         >
-          <div className="absolute inset-y-0 -left-1 -right-1" />
+          <div className="absolute inset-y-0 -left-[3px] -right-[3px]" />
         </div>
       )}
 
