@@ -81,7 +81,7 @@ export function AuthModal({ open, onAuthenticate, onClose }: AuthModalProps) {
           )}
 
           <Button type="submit" disabled={loading} className="w-full">
-            <Lock className="h-4 w-4" />
+            <Lock data-icon="inline-start" />
             {loading ? 'Authenticating...' : 'Sign In'}
           </Button>
         </form>

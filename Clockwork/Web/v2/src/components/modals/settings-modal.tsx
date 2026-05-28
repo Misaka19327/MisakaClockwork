@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings, X } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/i18n'
 import { useSettingsStore, type Locale } from '@/stores/settings-store'

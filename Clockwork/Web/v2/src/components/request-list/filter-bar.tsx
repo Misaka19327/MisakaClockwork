@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -90,10 +91,12 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
             <SelectValue placeholder={t('filter.type')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="request">{t('type.request')}</SelectItem>
-            <SelectItem value="command">{t('type.command')}</SelectItem>
-            <SelectItem value="queue-job">{t('type.queue-job')}</SelectItem>
-            <SelectItem value="test">{t('type.test')}</SelectItem>
+            <SelectGroup>
+              <SelectItem value="request">{t('type.request')}</SelectItem>
+              <SelectItem value="command">{t('type.command')}</SelectItem>
+              <SelectItem value="queue-job">{t('type.queue-job')}</SelectItem>
+              <SelectItem value="test">{t('type.test')}</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
 
@@ -106,10 +109,12 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
             <SelectValue placeholder={t('filter.status')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="2">{t('filter.status.2xx')}</SelectItem>
-            <SelectItem value="3">{t('filter.status.3xx')}</SelectItem>
-            <SelectItem value="4">{t('filter.status.4xx')}</SelectItem>
-            <SelectItem value="5">{t('filter.status.5xx')}</SelectItem>
+            <SelectGroup>
+              <SelectItem value="2">{t('filter.status.2xx')}</SelectItem>
+              <SelectItem value="3">{t('filter.status.3xx')}</SelectItem>
+              <SelectItem value="4">{t('filter.status.4xx')}</SelectItem>
+              <SelectItem value="5">{t('filter.status.5xx')}</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
 
@@ -122,9 +127,11 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
             <SelectValue placeholder={t('filter.duration')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="fast">{t('filter.duration.fast')}</SelectItem>
-            <SelectItem value="normal">{t('filter.duration.normal')}</SelectItem>
-            <SelectItem value="slow">{t('filter.duration.slow')}</SelectItem>
+            <SelectGroup>
+              <SelectItem value="fast">{t('filter.duration.fast')}</SelectItem>
+              <SelectItem value="normal">{t('filter.duration.normal')}</SelectItem>
+              <SelectItem value="slow">{t('filter.duration.slow')}</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
 
@@ -137,11 +144,13 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
             <SelectValue placeholder={t('filter.method')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="GET">GET</SelectItem>
-            <SelectItem value="POST">POST</SelectItem>
-            <SelectItem value="PUT">PUT</SelectItem>
-            <SelectItem value="PATCH">PATCH</SelectItem>
-            <SelectItem value="DELETE">DELETE</SelectItem>
+            <SelectGroup>
+              <SelectItem value="GET">GET</SelectItem>
+              <SelectItem value="POST">POST</SelectItem>
+              <SelectItem value="PUT">PUT</SelectItem>
+              <SelectItem value="PATCH">PATCH</SelectItem>
+              <SelectItem value="DELETE">DELETE</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
 
@@ -156,7 +165,7 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
                 !filters.timeStart && 'text-muted-foreground',
               )}
             >
-              <CalendarIcon className="mr-1 h-3.5 w-3.5 shrink-0" />
+              <CalendarIcon data-icon="inline-start" />
               {timeStartDate ? format(timeStartDate, 'MM-dd HH:mm') : t('filter.timeStart')}
             </Button>
           </PopoverTrigger>
@@ -208,7 +217,7 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
                 !filters.timeEnd && 'text-muted-foreground',
               )}
             >
-              <CalendarIcon className="mr-1 h-3.5 w-3.5 shrink-0" />
+              <CalendarIcon data-icon="inline-start" />
               {timeEndDate ? format(timeEndDate, 'MM-dd HH:mm') : t('filter.timeEnd')}
             </Button>
           </PopoverTrigger>
@@ -253,9 +262,9 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
             variant="ghost"
             size="icon"
             onClick={handleClear}
-            className="h-8 w-8 shrink-0"
+            className="size-8 shrink-0"
           >
-            <X className="h-4 w-4" />
+            <X data-icon="inline-start" />
           </Button>
         )}
       </div>
