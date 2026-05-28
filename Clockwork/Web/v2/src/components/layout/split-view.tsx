@@ -14,11 +14,11 @@ interface SplitViewProps {
 }
 
 const BREAKPOINT = 900
-const DESKTOP_PANEL_MIN = 320
-const DESKTOP_PANEL_MAX = 520
+const DESKTOP_PANEL_MIN = 340
+const DESKTOP_PANEL_MAX = 620
 
 function getDesktopLeftPanelWidth(viewportWidth: number) {
-  return Math.min(Math.max(Math.round(viewportWidth * 0.28), 360), 460)
+  return Math.min(Math.max(Math.round(viewportWidth * 0.34), 420), 540)
 }
 
 export function SplitView({
@@ -82,9 +82,9 @@ export function SplitView({
         panelRef={leftPanelRef}
         defaultSize={`${getDesktopLeftPanelWidth(window.innerWidth)}px`}
         minSize={`${DESKTOP_PANEL_MIN}px`}
-        maxSize={`${DESKTOP_PANEL_MAX}px`}
+        maxSize={expanded ? '100%' : `${DESKTOP_PANEL_MAX}px`}
         groupResizeBehavior="preserve-pixel-size"
-        className="min-w-[320px] overflow-hidden transition-[flex-grow] duration-300 ease-out"
+        className="min-w-[340px] overflow-hidden transition-[flex-grow,flex-basis] duration-300 ease-in-out"
       >
         {leftPanel}
       </ResizablePanel>
@@ -101,7 +101,7 @@ export function SplitView({
         collapsible
         collapsedSize={0}
         minSize="480px"
-        className="min-w-0 overflow-hidden transition-[flex-grow] duration-300 ease-out"
+        className="min-w-0 overflow-hidden transition-[flex-grow,flex-basis] duration-300 ease-in-out"
       >
         {rightPanel}
       </ResizablePanel>

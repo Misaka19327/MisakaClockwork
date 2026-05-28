@@ -195,20 +195,18 @@ export function RequestRow({ request, isSelected, onClick, compact = false, clas
 
             <span
               className="min-w-0 truncate text-[10px] text-muted-foreground"
-              title={handler}
             >
               {handler}
             </span>
           </div>
 
-          <span className="truncate text-xs text-foreground" title={compactTitle}>
+          <span className="truncate pr-1 text-xs text-foreground">
             {compactTitle}
           </span>
         </div>
 
         <span
-          className="shrink-0 text-[10px] tabular-nums text-muted-foreground text-right leading-tight"
-          title={formatDateTime(request.time)}
+          className="w-[56px] shrink-0 text-[10px] tabular-nums text-muted-foreground text-right leading-tight"
         >
           <span className="block">{formatDateOnly(request.time)}</span>
           <span className="block">{formatTimeOnly(request.time)}</span>
