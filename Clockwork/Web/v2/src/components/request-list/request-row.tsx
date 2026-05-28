@@ -11,6 +11,8 @@ interface RequestRowProps {
   className?: string
 }
 
+export const COMPACT_REQUEST_ROW_HEIGHT = 84
+
 const methodStyles: Record<string, string> = {
   GET: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
   POST: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
@@ -160,15 +162,15 @@ export function RequestRow({ request, isSelected, onClick, compact = false, clas
       <div
         onClick={onClick}
         className={cn(
-          'flex min-h-[72px] min-w-0 cursor-pointer items-center gap-2 overflow-hidden border-b border-border/50 px-2 py-2.5 text-sm transition-colors last:border-0',
+          'flex h-full min-h-0 min-w-0 cursor-pointer items-center gap-2.5 overflow-hidden border-b border-border/50 px-2.5 py-3 text-sm transition-colors last:border-0',
           isSelected
             ? 'bg-primary/10 border-l-2 border-l-primary'
             : 'hover:bg-muted/50 border-l-2 border-l-transparent',
           className,
         )}
       >
-        <div className="flex w-0 flex-1 flex-col gap-1.5">
-          <div className="flex min-w-0 items-center gap-1">
+        <div className="flex w-0 flex-1 flex-col justify-center gap-2 self-stretch">
+          <div className="flex min-w-0 items-center gap-1.5">
             <span
               className={cn(
                 'shrink-0 rounded px-1 py-0.5 text-[10px] font-bold',
@@ -194,21 +196,21 @@ export function RequestRow({ request, isSelected, onClick, compact = false, clas
             )}
 
             <span
-              className="min-w-0 truncate text-[9px] text-muted-foreground"
+              className="min-w-0 truncate text-[10px] leading-4 text-muted-foreground"
             >
               {handler}
             </span>
           </div>
 
-          <span className="line-clamp-2 min-h-8 pr-1 text-[12px] leading-4 text-foreground">
+          <span className="line-clamp-2 min-h-[2.5rem] pr-1 text-[12px] leading-5 text-foreground">
             {compactTitle}
           </span>
         </div>
 
         <span
-          className="w-[44px] shrink-0 text-[9px] tabular-nums text-muted-foreground text-right leading-tight"
+          className="w-[56px] shrink-0 self-stretch text-right text-[10px] tabular-nums leading-4 text-muted-foreground"
         >
-          <span className="block">{formatDateOnly(request.time)}</span>
+          <span className="block pt-1">{formatDateOnly(request.time)}</span>
           <span className="block">{formatTimeOnly(request.time).slice(0, 5)}</span>
         </span>
       </div>

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import { Loader2, ArrowDown } from 'lucide-react'
 import { useTranslation } from '@/i18n'
 import type { ClockworkRequest, SearchFilters } from '@/types/clockwork'
-import { RequestRow } from './request-row'
+import { COMPACT_REQUEST_ROW_HEIGHT, RequestRow } from './request-row'
 import { FilterBar } from './filter-bar'
 import { FilterTags } from './filter-tags'
 
@@ -39,12 +39,13 @@ export function RequestList({
   const parentRef = useRef<HTMLDivElement>(null)
   const previousCountRef = useRef(requests.length)
 
-  const rowHeight = compact ? 72 : 36
+  const rowHeight = compact ? COMPACT_REQUEST_ROW_HEIGHT : 36
 
   const virtualizer = useVirtualizer({
     count: hasMore ? requests.length + 1 : requests.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => rowHeight,
+    measureElement: (element) => element.getBoundingClientRect().height,
     overscan: 20,
   })
 
@@ -137,12 +138,13 @@ export function RequestList({
             return (
               <div
                 key={request.id}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
                 style={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
                   width: '100%',
-                  height: `${virtualItem.size}px`,
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
               >
