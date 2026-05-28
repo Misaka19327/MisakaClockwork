@@ -66,9 +66,9 @@ export function RequestList({
   )
 
   return (
-    <div className={cn('flex h-full flex-col bg-sidebar-background', !expanded && 'border-r border-border', className)}>
+    <div className={cn('flex h-full w-full min-w-0 flex-col bg-sidebar-background', !expanded && 'border-r border-border', className)}>
       {/* Header: Filter area */}
-      <div className="shrink-0 border-b border-border p-2 space-y-1.5">
+      <div className="flex shrink-0 flex-col gap-1.5 border-b border-border p-2">
         {!compact ? (
           <FilterBar filters={filters} onFiltersChange={onFiltersChange} />
         ) : (
@@ -78,7 +78,7 @@ export function RequestList({
 
       {/* Column headers (expanded mode only) */}
       {!compact && (
-        <div className="shrink-0 flex items-center gap-3 border-b border-border px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           <span className="w-16 text-center">{t('column.type')}</span>
           <span className="w-12 text-right">{t('column.status')}</span>
           <span className="w-20">{t('column.duration')}</span>
@@ -91,7 +91,7 @@ export function RequestList({
       )}
 
       {/* Virtual list */}
-      <div ref={parentRef} className="flex-1 overflow-auto">
+      <div ref={parentRef} className="min-h-0 flex-1 overflow-auto">
         <div
           style={{
             height: `${virtualizer.getTotalSize()}px`,

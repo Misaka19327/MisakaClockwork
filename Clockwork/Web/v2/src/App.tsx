@@ -5,6 +5,7 @@ import { useDarkMode } from '@/hooks/use-dark-mode'
 import { useRequestStore } from '@/stores/request-store'
 import { useSettingsStore } from '@/stores/settings-store'
 import { useRequestList, useLoadOlder } from '@/api/requests'
+import { Button } from '@/components/ui/button'
 import { SplitView } from '@/components/layout/split-view'
 import { RequestList } from '@/components/request-list/request-list'
 import { RequestDetail } from '@/components/request-detail/request-detail'
@@ -44,21 +45,23 @@ function LayoutInner({ expanded }: { expanded: boolean }) {
 
   return (
     <I18nProvider locale={locale}>
-      <div className="h-screen w-full flex flex-col overflow-hidden bg-background text-foreground">
+      <div className="flex h-screen w-full min-w-0 flex-col overflow-hidden bg-background text-foreground">
         {/* Top bar */}
-        <div className="shrink-0 flex items-center border-b border-border/70 px-4 h-10 bg-sidebar-background/50">
+        <div className="flex h-10 shrink-0 items-center border-b border-border/70 bg-sidebar-background/50 px-4">
           <span className="text-[13px] font-semibold tracking-tight text-foreground/90">MisakaClockWork</span>
           <div className="flex-1" />
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setSettingsOpen(true)}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-150"
+            className="size-8 text-muted-foreground"
           >
-            <Settings className="h-4 w-4" />
-          </button>
+            <Settings />
+          </Button>
         </div>
         {/* Main content */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
           <SplitView
             leftPanel={<LeftPanel expanded={expanded} />}
             rightPanel={<RightPanel />}

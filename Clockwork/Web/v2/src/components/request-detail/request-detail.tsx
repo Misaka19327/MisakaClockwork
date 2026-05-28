@@ -103,7 +103,7 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
     return (
       <div
         className={cn(
-          'flex items-center justify-center bg-background text-muted-foreground',
+          'flex h-full w-full min-w-0 items-center justify-center bg-background text-muted-foreground',
           className,
         )}
       >
@@ -115,9 +115,9 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
   }
 
   return (
-    <div className={cn('flex h-full flex-col bg-background', className)}>
+    <div className={cn('flex h-full w-full min-w-0 flex-col bg-background', className)}>
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5">
+      <div className="flex min-w-0 shrink-0 items-center gap-3 border-b border-border px-4 py-2.5">
         <MethodBadge method={request.method} />
         <span className="flex-1 truncate font-mono text-sm text-foreground">
           {request.uri ?? request.url ?? request.commandName ?? request.jobName ?? request.testName ?? request.id}
@@ -144,9 +144,9 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
       </div>
 
       {/* UUID row */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-4 py-1">
+      <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-border/50 px-4 py-1">
         <span className="text-[11px] text-muted-foreground">UUID</span>
-        <code className="text-[11px] font-mono text-foreground/70 select-all">{request.uuid}</code>
+        <code className="min-w-0 truncate text-[11px] font-mono text-foreground/70 select-all">{request.uuid}</code>
         <button
           type="button"
           onClick={() => navigator.clipboard.writeText(request.uuid)}
@@ -161,7 +161,7 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
       <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Tab content */}
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto">
         {activeTab === 'request' && <RequestTab request={request} />}
         {activeTab === 'performance' && <PerformanceTab request={request} />}
         {activeTab === 'log' && request.log && <LogTab messages={request.log} />}

@@ -109,7 +109,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           {/* Editor */}
           <section>
             <Label className="mb-2 block text-sm font-medium">{t('settings.editor')}</Label>
-            <Select value={editor} onValueChange={setEditor}>
+            <Select value={editor} onValueChange={(value) => value && setEditor(value)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectGroup>

@@ -54,8 +54,8 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
   const endDate = filters.timeEnd ? new Date(filters.timeEnd) : undefined
 
   return (
-    <div className={cn('space-y-1.5', className)}>
-      <div className="flex items-center gap-1.5 flex-wrap">
+    <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         {/* Search */}
         <div className="relative flex-1 min-w-[140px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -129,17 +129,19 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
 
         {/* Start date */}
         <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn('h-8 justify-start text-left font-normal text-xs min-w-[130px]', !startDate && 'text-muted-foreground')}
-            >
-              <CalendarIcon data-icon="inline-start" />
-              {startDate ? format(startDate, 'MM-dd HH:mm') : t('filter.timeStart')}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn('h-8 justify-start text-left font-normal text-xs min-w-[130px]', !startDate && 'text-muted-foreground')}
+              >
+                <CalendarIcon data-icon="inline-start" />
+                {startDate ? format(startDate, 'MM-dd HH:mm') : t('filter.timeStart')}
+              </Button>
+            }
+          />
+          <PopoverContent className="w-auto p-0">
             <Calendar
               mode="single"
               selected={startDate}
@@ -171,17 +173,19 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
 
         {/* End date */}
         <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn('h-8 justify-start text-left font-normal text-xs min-w-[130px]', !endDate && 'text-muted-foreground')}
-            >
-              <CalendarIcon data-icon="inline-start" />
-              {endDate ? format(endDate, 'MM-dd HH:mm') : t('filter.timeEnd')}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn('h-8 justify-start text-left font-normal text-xs min-w-[130px]', !endDate && 'text-muted-foreground')}
+              >
+                <CalendarIcon data-icon="inline-start" />
+                {endDate ? format(endDate, 'MM-dd HH:mm') : t('filter.timeEnd')}
+              </Button>
+            }
+          />
+          <PopoverContent className="w-auto p-0">
             <Calendar
               mode="single"
               selected={endDate}
