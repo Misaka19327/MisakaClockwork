@@ -55,10 +55,10 @@ export function SplitView({
   return (
     <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0">
       <ResizablePanel
-        defaultSize={36}
-        minSize={22}
-        maxSize={68}
-        className="min-w-[280px] overflow-hidden"
+        defaultSize={30}
+        minSize={9}
+        maxSize={62}
+        className="min-w-[180px] overflow-hidden"
       >
         {leftPanel}
       </ResizablePanel>

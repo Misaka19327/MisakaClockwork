@@ -85,13 +85,31 @@ export function FilterTags({ filters, className, compact = false }: FilterTagsPr
 
   if (tags.length === 0) return null
 
+  if (compact) {
+    return (
+      <div className={cn('min-w-0 overflow-x-auto overflow-y-hidden pb-1', className)}>
+        <div className="flex w-max min-w-0 gap-1">
+          {tags.map(({ key, value }) => (
+            <span
+              key={`${key}:${value}`}
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium whitespace-nowrap',
+                tagColors[key] ?? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+              )}
+            >
+              <span className="shrink-0 opacity-60">{t((filterLabelMap[key] ?? key) as any)}：</span>
+              <span>{getDisplayValue(key, value)}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
-        'min-w-0 transition-all duration-300',
-        compact
-          ? 'flex flex-col gap-1 overflow-y-auto'
-          : 'flex flex-wrap gap-1 overflow-hidden max-h-20',
+        'min-w-0 flex flex-wrap gap-1 overflow-hidden max-h-20 transition-all duration-300',
         className,
       )}
     >
@@ -99,14 +117,12 @@ export function FilterTags({ filters, className, compact = false }: FilterTagsPr
         <span
           key={`${key}:${value}`}
           className={cn(
-            compact
-              ? 'inline-flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-xs font-medium'
-              : 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium whitespace-nowrap',
+            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium whitespace-nowrap',
             tagColors[key] ?? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
           )}
         >
-          <span className={cn('opacity-60', compact && 'shrink-0')}>{t((filterLabelMap[key] ?? key) as any)}：</span>
-          <span className={cn('min-w-0', compact && 'truncate')}>{getDisplayValue(key, value)}</span>
+          <span className="opacity-60">{t((filterLabelMap[key] ?? key) as any)}：</span>
+          <span>{getDisplayValue(key, value)}</span>
         </span>
       ))}
     </div>

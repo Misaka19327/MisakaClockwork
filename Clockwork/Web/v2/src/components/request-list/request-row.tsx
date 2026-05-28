@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { formatDuration, formatMemory, formatDateTime, formatDateOnly, formatTimeOnly, truncate } from '@/utils/format'
+import { formatDuration, formatMemory, formatDateTime, formatTimeOnly, truncate } from '@/utils/format'
 import type { ClockworkRequest } from '@/types/clockwork'
 import { AlertTriangle } from 'lucide-react'
 
@@ -153,53 +153,64 @@ export function RequestRow({ request, isSelected, onClick, compact = false, clas
   const path = getPath(request)
   const hasError = hasException(request)
   const isHttpRequest = request.type === 'request'
+  const compactTitle = path || handler || request.id
 
   if (compact) {
     return (
       <div
         onClick={onClick}
         className={cn(
-          'flex cursor-pointer items-center gap-2 border-b border-border/50 px-2 py-1.5 text-sm transition-colors last:border-0',
+          'flex min-h-[52px] min-w-0 cursor-pointer items-center gap-2 overflow-hidden border-b border-border/50 px-2 py-2 text-sm transition-colors last:border-0',
           isSelected
             ? 'bg-primary/10 border-l-2 border-l-primary'
             : 'hover:bg-muted/50 border-l-2 border-l-transparent',
           className,
         )}
       >
-        {/* Type badge */}
-        <span
-          className={cn(
-            'shrink-0 rounded px-1 py-0.5 text-[10px] font-bold',
-            typeBadge.style,
-          )}
-        >
-          {typeBadge.label}
-        </span>
+        <div className="flex w-0 flex-1 flex-col gap-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span
+              className={cn(
+                'shrink-0 rounded px-1 py-0.5 text-[10px] font-bold',
+                typeBadge.style,
+              )}
+            >
+              {typeBadge.label}
+            </span>
 
-        {/* Status */}
-        {status && (
-          <span
-            className={cn(
-              'shrink-0 text-xs font-semibold tabular-nums',
-              status.style,
+            {status && (
+              <span
+                className={cn(
+                  'shrink-0 text-xs font-semibold tabular-nums',
+                  status.style,
+                )}
+              >
+                {status.text}
+              </span>
             )}
-          >
-            {status.text}
+
+            {hasError && !status?.hasError && (
+              <AlertTriangle className="h-3 w-3 shrink-0 text-red-500" />
+            )}
+
+            <span
+              className="min-w-0 truncate text-[10px] text-muted-foreground"
+              title={handler}
+            >
+              {handler}
+            </span>
+          </div>
+
+          <span className="truncate text-xs text-foreground" title={compactTitle}>
+            {compactTitle}
           </span>
-        )}
+        </div>
 
-        {/* Error indicator */}
-        {hasError && !status?.hasError && (
-          <AlertTriangle className="h-3 w-3 shrink-0 text-red-500" />
-        )}
-
-        {/* Handler name */}
-        <span className="flex-1 truncate text-foreground text-xs">{handler}</span>
-
-        {/* Time - two lines: date on top, time on bottom */}
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground text-right leading-tight">
-          <span className="block">{formatDateOnly(request.time)}</span>
-          <span className="block">{formatTimeOnly(request.time)}</span>
+        <span
+          className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
+          title={formatDateTime(request.time)}
+        >
+          {formatTimeOnly(request.time)}
         </span>
       </div>
     )
