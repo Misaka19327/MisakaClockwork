@@ -93,9 +93,11 @@ export function SplitView({
       {/* Left panel */}
       <div
         className={cn(
-          'shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out',
+          expanded
+            ? 'flex-1 min-w-0 overflow-hidden'
+            : 'shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out',
         )}
-        style={{ width: expanded ? '100%' : leftWidth }}
+        style={expanded ? undefined : { width: leftWidth }}
       >
         {leftPanel}
       </div>
