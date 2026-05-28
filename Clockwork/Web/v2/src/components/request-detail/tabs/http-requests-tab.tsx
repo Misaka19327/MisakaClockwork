@@ -125,7 +125,7 @@ export function HttpRequestTab({ requests, className }: HttpRequestTabProps) {
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="shrink-0 border-b border-border/50 px-4 py-2 text-xs text-muted-foreground">
+      <div className="shrink-0 border-b border-border px-4 py-2 text-xs text-muted-foreground">
         {requests.length} HTTP request{requests.length !== 1 ? 's' : ''}
       </div>
       <div className="flex-1 overflow-auto">

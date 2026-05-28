@@ -103,13 +103,12 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
     return (
       <div
         className={cn(
-          'flex h-full items-center justify-center bg-background text-muted-foreground/60',
+          'flex items-center justify-center bg-background text-muted-foreground',
           className,
         )}
       >
-        <div className="text-center space-y-1">
+        <div className="text-center">
           <p className="text-sm">Select a request to view details</p>
-          <p className="text-xs text-muted-foreground/40">Click on any item in the list</p>
         </div>
       </div>
     )
@@ -118,7 +117,7 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
   return (
     <div className={cn('flex h-full flex-col bg-background', className)}>
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-border/60 px-4 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5">
         <MethodBadge method={request.method} />
         <span className="flex-1 truncate font-mono text-sm text-foreground">
           {request.uri ?? request.url ?? request.commandName ?? request.jobName ?? request.testName ?? request.id}
@@ -145,9 +144,9 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
       </div>
 
       {/* UUID row */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border/40 px-4 py-1.5">
-        <span className="text-[11px] text-muted-foreground/60 font-medium">UUID</span>
-        <code className="text-[11px] font-mono text-foreground/60 select-all">{request.uuid}</code>
+      <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-4 py-1">
+        <span className="text-[11px] text-muted-foreground">UUID</span>
+        <code className="text-[11px] font-mono text-foreground/70 select-all">{request.uuid}</code>
         <button
           type="button"
           onClick={() => navigator.clipboard.writeText(request.uuid)}

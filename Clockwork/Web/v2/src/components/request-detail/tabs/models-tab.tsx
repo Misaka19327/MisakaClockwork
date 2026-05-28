@@ -99,7 +99,7 @@ function CountsTable({
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-border/50 bg-muted/30">
+          <tr className="border-b border-border bg-muted/50">
             <th className="px-3 py-2 font-medium text-muted-foreground">Model</th>
             <th className="px-3 py-2 font-medium text-muted-foreground text-right">Retrieved</th>
             <th className="px-3 py-2 font-medium text-muted-foreground text-right">Created</th>
@@ -179,7 +179,7 @@ export function ModelsTab({ actions, retrieved, created, updated, deleted, class
   return (
     <div className={cn('flex flex-col', className)}>
       {/* Sub-tabs */}
-      <div className="flex shrink-0 border-b border-border/50">
+      <div className="flex shrink-0 border-b border-border">
         <button
           type="button"
           onClick={() => setSubTab('actions')}

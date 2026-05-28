@@ -23,7 +23,7 @@ export function KeyValueTable({
     <div className={cn('overflow-x-auto', className)}>
       <table className="w-full border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-border/40 bg-muted/30">
+          <tr className="border-b border-border bg-muted/50">
             <th className="px-3 py-2 font-medium text-muted-foreground">Key</th>
             <th className="px-3 py-2 font-medium text-muted-foreground">Value</th>
           </tr>

@@ -29,14 +29,12 @@ export function TabBar({ tabs, activeTab, onTabChange, className }: TabBarProps)
                 'data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none',
               )}
             >
-              <span className="inline-flex items-center gap-1.5">
-                {tab.label}
-                {tab.badge != null && (
-                  <span className="rounded-full bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
-                    {tab.badge}
-                  </span>
-                )}
-              </span>
+              {tab.label}
+              {tab.badge != null && (
+                <span className="ml-1.5 rounded-full bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+                  {tab.badge}
+                </span>
+              )}
             </TabsTrigger>
           ))}
         </TabsList>

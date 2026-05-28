@@ -159,10 +159,10 @@ export function RequestRow({ request, isSelected, onClick, compact = false, clas
       <div
         onClick={onClick}
         className={cn(
-          'flex cursor-pointer items-center gap-2 border-b border-border/30 px-2 py-1.5 text-sm transition-colors duration-100 last:border-0',
+          'flex cursor-pointer items-center gap-2 border-b border-border/50 px-2 py-1.5 text-sm transition-colors last:border-0',
           isSelected
-            ? 'bg-primary/15 border-l-2 border-l-primary'
-            : 'hover:bg-accent/60 border-l-2 border-l-transparent',
+            ? 'bg-primary/10 border-l-2 border-l-primary'
+            : 'hover:bg-muted/50 border-l-2 border-l-transparent',
           className,
         )}
       >
@@ -210,10 +210,10 @@ export function RequestRow({ request, isSelected, onClick, compact = false, clas
     <div
       onClick={onClick}
       className={cn(
-        'flex cursor-pointer items-center gap-3 border-b border-border/30 px-3 py-1.5 text-sm transition-colors duration-100 last:border-0',
+        'flex cursor-pointer items-center gap-3 border-b border-border/50 px-3 py-1.5 text-sm transition-colors last:border-0',
         isSelected
-          ? 'bg-primary/15 border-l-2 border-l-primary'
-          : 'hover:bg-accent/60 border-l-2 border-l-transparent',
+          ? 'bg-primary/10 border-l-2 border-l-primary'
+          : 'hover:bg-muted/50 border-l-2 border-l-transparent',
         className,
       )}
     >
@@ -257,7 +257,7 @@ export function RequestRow({ request, isSelected, onClick, compact = false, clas
       </span>
 
       {/* Path */}
-      <span className="flex-1 min-w-0 truncate text-xs text-foreground/80" title={path}>
+      <span className="flex-1 truncate text-xs text-foreground/80" title={path}>
         {path || '-'}
       </span>
 

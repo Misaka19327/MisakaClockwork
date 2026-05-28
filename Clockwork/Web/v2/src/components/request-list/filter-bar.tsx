@@ -23,16 +23,15 @@ interface FilterBarProps {
   className?: string
 }
 
-function toLocalDatetimeStr(date: Date): string {
+function toDatetimeLocal(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function parseTimeFromStr(str: string): { h: number; m: number } | null {
-  const parts = str.split(':')
-  if (parts.length !== 2) return null
-  const h = Number(parts[0])
-  const m = Number(parts[1])
+function parseTime(v: string): { h: number; m: number } | null {
+  const p = v.split(':')
+  if (p.length !== 2) return null
+  const h = Number(p[0]); const m = Number(p[1])
   if (isNaN(h) || isNaN(m)) return null
   return { h, m }
 }
@@ -41,52 +40,35 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
   const { t } = useTranslation()
   const [searchInput, setSearchInput] = useState(filters.search ?? '')
 
-  const updateFilter = useCallback(
-    (key: string, value: string | string[] | undefined) => {
-      onFiltersChange({ ...filters, [key]: value || undefined })
-    },
+  const update = useCallback(
+    (key: string, value: string | string[] | undefined) =>
+      onFiltersChange({ ...filters, [key]: value || undefined }),
     [filters, onFiltersChange],
   )
 
-  const handleClear = useCallback(() => {
-    setSearchInput('')
-    onFiltersChange({})
-  }, [onFiltersChange])
+  const active =
+    filters.search || filters.type?.length || filters.status?.length ||
+    filters.durationRange || filters.timeStart || filters.timeEnd || filters.method?.length
 
-  const hasActiveFilters =
-    filters.search ||
-    filters.type?.length ||
-    filters.status?.length ||
-    filters.durationRange ||
-    filters.timeStart ||
-    filters.timeEnd ||
-    filters.method?.length
-
-  const timeStartDate = filters.timeStart ? new Date(filters.timeStart) : undefined
-  const timeEndDate = filters.timeEnd ? new Date(filters.timeEnd) : undefined
+  const startDate = filters.timeStart ? new Date(filters.timeStart) : undefined
+  const endDate = filters.timeEnd ? new Date(filters.timeEnd) : undefined
 
   return (
     <div className={cn('space-y-1.5', className)}>
       <div className="flex items-center gap-1.5 flex-wrap">
-        {/* Search input */}
+        {/* Search */}
         <div className="relative flex-1 min-w-[140px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
           <Input
             value={searchInput}
-            onChange={(e) => {
-              setSearchInput(e.target.value)
-              updateFilter('search', e.target.value || undefined)
-            }}
+            onChange={(e) => { setSearchInput(e.target.value); update('search', e.target.value || undefined) }}
             placeholder={t('filter.search')}
             className="pl-8 h-8 text-xs"
           />
         </div>
 
-        {/* Type select */}
-        <Select
-          value={filters.type?.[0] ?? ''}
-          onValueChange={(v) => updateFilter('type', v ? [v] : undefined)}
-        >
+        {/* Type */}
+        <Select value={filters.type?.[0] ?? ''} onValueChange={(v) => update('type', v ? [v] : undefined)}>
           <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
             <SelectValue placeholder={t('filter.type')} />
           </SelectTrigger>
@@ -100,11 +82,8 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
           </SelectContent>
         </Select>
 
-        {/* Status select */}
-        <Select
-          value={filters.status?.[0] ?? ''}
-          onValueChange={(v) => updateFilter('status', v ? [v] : undefined)}
-        >
+        {/* Status */}
+        <Select value={filters.status?.[0] ?? ''} onValueChange={(v) => update('status', v ? [v] : undefined)}>
           <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
             <SelectValue placeholder={t('filter.status')} />
           </SelectTrigger>
@@ -118,11 +97,8 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
           </SelectContent>
         </Select>
 
-        {/* Duration select */}
-        <Select
-          value={filters.durationRange ?? ''}
-          onValueChange={(v) => updateFilter('durationRange', v || undefined)}
-        >
+        {/* Duration */}
+        <Select value={filters.durationRange ?? ''} onValueChange={(v) => update('durationRange', v || undefined)}>
           <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
             <SelectValue placeholder={t('filter.duration')} />
           </SelectTrigger>
@@ -135,11 +111,8 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
           </SelectContent>
         </Select>
 
-        {/* Method select */}
-        <Select
-          value={filters.method?.[0] ?? ''}
-          onValueChange={(v) => updateFilter('method', v ? [v] : undefined)}
-        >
+        {/* Method */}
+        <Select value={filters.method?.[0] ?? ''} onValueChange={(v) => update('method', v ? [v] : undefined)}>
           <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
             <SelectValue placeholder={t('filter.method')} />
           </SelectTrigger>
@@ -154,48 +127,38 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
           </SelectContent>
         </Select>
 
-        {/* Time start date picker */}
+        {/* Start date */}
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               size="sm"
-              className={cn(
-                'h-8 justify-start text-left font-normal text-xs min-w-[130px]',
-                !filters.timeStart && 'text-muted-foreground',
-              )}
+              className={cn('h-8 justify-start text-left font-normal text-xs min-w-[130px]', !startDate && 'text-muted-foreground')}
             >
               <CalendarIcon data-icon="inline-start" />
-              {timeStartDate ? format(timeStartDate, 'MM-dd HH:mm') : t('filter.timeStart')}
+              {startDate ? format(startDate, 'MM-dd HH:mm') : t('filter.timeStart')}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
-              selected={timeStartDate}
+              selected={startDate}
               onSelect={(date) => {
                 if (date) {
                   const d = new Date(date)
-                  if (timeStartDate) {
-                    d.setHours(timeStartDate.getHours(), timeStartDate.getMinutes())
-                  }
-                  updateFilter('timeStart', toLocalDatetimeStr(d))
+                  if (startDate) { d.setHours(startDate.getHours(), startDate.getMinutes()) }
+                  update('timeStart', toDatetimeLocal(d))
                 }
               }}
-              initialFocus
             />
-            {filters.timeStart && (
+            {startDate && (
               <div className="border-t p-2">
                 <input
                   type="time"
-                  value={`${String(timeStartDate!.getHours()).padStart(2, '0')}:${String(timeStartDate!.getMinutes()).padStart(2, '0')}`}
+                  value={`${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`}
                   onChange={(e) => {
-                    const parsed = parseTimeFromStr(e.target.value)
-                    if (parsed && timeStartDate) {
-                      const d = new Date(timeStartDate)
-                      d.setHours(parsed.h, parsed.m)
-                      updateFilter('timeStart', toLocalDatetimeStr(d))
-                    }
+                    const t = parseTime(e.target.value)
+                    if (t) { const d = new Date(startDate); d.setHours(t.h, t.m); update('timeStart', toDatetimeLocal(d)) }
                   }}
                   className="w-full rounded border border-input bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
                 />
@@ -206,48 +169,38 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
 
         <span className="text-xs text-muted-foreground shrink-0">~</span>
 
-        {/* Time end date picker */}
+        {/* End date */}
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               size="sm"
-              className={cn(
-                'h-8 justify-start text-left font-normal text-xs min-w-[130px]',
-                !filters.timeEnd && 'text-muted-foreground',
-              )}
+              className={cn('h-8 justify-start text-left font-normal text-xs min-w-[130px]', !endDate && 'text-muted-foreground')}
             >
               <CalendarIcon data-icon="inline-start" />
-              {timeEndDate ? format(timeEndDate, 'MM-dd HH:mm') : t('filter.timeEnd')}
+              {endDate ? format(endDate, 'MM-dd HH:mm') : t('filter.timeEnd')}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
-              selected={timeEndDate}
+              selected={endDate}
               onSelect={(date) => {
                 if (date) {
                   const d = new Date(date)
-                  if (timeEndDate) {
-                    d.setHours(timeEndDate.getHours(), timeEndDate.getMinutes())
-                  }
-                  updateFilter('timeEnd', toLocalDatetimeStr(d))
+                  if (endDate) { d.setHours(endDate.getHours(), endDate.getMinutes()) }
+                  update('timeEnd', toDatetimeLocal(d))
                 }
               }}
-              initialFocus
             />
-            {filters.timeEnd && (
+            {endDate && (
               <div className="border-t p-2">
                 <input
                   type="time"
-                  value={`${String(timeEndDate!.getHours()).padStart(2, '0')}:${String(timeEndDate!.getMinutes()).padStart(2, '0')}`}
+                  value={`${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`}
                   onChange={(e) => {
-                    const parsed = parseTimeFromStr(e.target.value)
-                    if (parsed && timeEndDate) {
-                      const d = new Date(timeEndDate)
-                      d.setHours(parsed.h, parsed.m)
-                      updateFilter('timeEnd', toLocalDatetimeStr(d))
-                    }
+                    const t = parseTime(e.target.value)
+                    if (t) { const d = new Date(endDate); d.setHours(t.h, t.m); update('timeEnd', toDatetimeLocal(d)) }
                   }}
                   className="w-full rounded border border-input bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
                 />
@@ -256,15 +209,10 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
           </PopoverContent>
         </Popover>
 
-        {/* Clear all */}
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClear}
-            className="size-8 shrink-0"
-          >
-            <X data-icon="inline-start" />
+        {/* Clear */}
+        {active && (
+          <Button variant="ghost" size="icon" onClick={() => { setSearchInput(''); onFiltersChange({}) }} className="size-8 shrink-0">
+            <X />
           </Button>
         )}
       </div>

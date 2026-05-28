@@ -66,9 +66,9 @@ export function RequestList({
   )
 
   return (
-    <div className={cn('flex h-full flex-col bg-sidebar-background', !expanded && 'border-r border-border/50', className)}>
+    <div className={cn('flex h-full flex-col bg-sidebar-background', !expanded && 'border-r border-border', className)}>
       {/* Header: Filter area */}
-      <div className="shrink-0 border-b border-border/60 p-2.5 space-y-1.5">
+      <div className="shrink-0 border-b border-border p-2 space-y-1.5">
         {!compact ? (
           <FilterBar filters={filters} onFiltersChange={onFiltersChange} />
         ) : (
@@ -78,13 +78,13 @@ export function RequestList({
 
       {/* Column headers (expanded mode only) */}
       {!compact && (
-        <div className="shrink-0 flex items-center gap-3 border-b border-border/50 px-3 py-1.5 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider">
+        <div className="shrink-0 flex items-center gap-3 border-b border-border px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
           <span className="w-16 text-center">{t('column.type')}</span>
           <span className="w-12 text-right">{t('column.status')}</span>
           <span className="w-20">{t('column.duration')}</span>
           <span className="w-16">{t('column.memory')}</span>
           <span className="w-36">{t('column.time')}</span>
-          <span className="flex-1 min-w-0">{t('column.path')}</span>
+          <span className="flex-1">{t('column.path')}</span>
           <span className="w-16">{t('column.method')}</span>
           <span className="w-60">{t('column.handler')}</span>
         </div>
@@ -159,7 +159,7 @@ export function RequestList({
       </div>
 
       {/* Footer count */}
-      <div className="shrink-0 border-t border-border/50 px-3 py-1.5 text-[11px] text-muted-foreground/70">
+      <div className="shrink-0 border-t border-border px-3 py-1 text-xs text-muted-foreground">
         {t('footer.requests', { count: requests.length }).replace('{count}', String(requests.length))}
       </div>
     </div>

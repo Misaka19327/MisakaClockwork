@@ -71,7 +71,7 @@ function HttpRequestTab({ request, className }: { request: ClockworkRequest; cla
       {/* Headers */}
       {request.headers && Object.keys(request.headers).length > 0 && (
         <Section title="Headers">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable
               data={Object.fromEntries(
                 Object.entries(request.headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : v]),
@@ -84,7 +84,7 @@ function HttpRequestTab({ request, className }: { request: ClockworkRequest; cla
       {/* GET Data */}
       {request.getData && Object.keys(request.getData).length > 0 && (
         <Section title="GET Data">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={request.getData} />
           </div>
         </Section>
@@ -93,7 +93,7 @@ function HttpRequestTab({ request, className }: { request: ClockworkRequest; cla
       {/* POST Data */}
       {request.postData && Object.keys(request.postData).length > 0 && (
         <Section title="POST Data">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={request.postData} />
           </div>
         </Section>
@@ -102,7 +102,7 @@ function HttpRequestTab({ request, className }: { request: ClockworkRequest; cla
       {/* Session */}
       {request.sessionData && Object.keys(request.sessionData).length > 0 && (
         <Section title="Session">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={request.sessionData} />
           </div>
         </Section>
@@ -111,7 +111,7 @@ function HttpRequestTab({ request, className }: { request: ClockworkRequest; cla
       {/* Cookies */}
       {request.cookies && Object.keys(request.cookies).length > 0 && (
         <Section title="Cookies">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={Object.fromEntries(Object.entries(request.cookies))} />
           </div>
         </Section>
@@ -120,7 +120,7 @@ function HttpRequestTab({ request, className }: { request: ClockworkRequest; cla
       {/* Authenticated User */}
       {request.authenticatedUser && (
         <Section title="Authenticated User">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={request.authenticatedUser as Record<string, unknown>} />
           </div>
         </Section>
@@ -147,7 +147,7 @@ function CommandRequestTab({ request, className }: { request: ClockworkRequest; 
 
       {request.commandArguments && Object.keys(request.commandArguments).length > 0 && (
         <Section title="Arguments">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={request.commandArguments} />
           </div>
         </Section>
@@ -155,7 +155,7 @@ function CommandRequestTab({ request, className }: { request: ClockworkRequest; 
 
       {request.commandOptions && Object.keys(request.commandOptions).length > 0 && (
         <Section title="Options">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={request.commandOptions} />
           </div>
         </Section>
@@ -163,7 +163,7 @@ function CommandRequestTab({ request, className }: { request: ClockworkRequest; 
 
       {request.commandOutput && (
         <Section title="Output">
-          <pre className="max-h-64 overflow-auto rounded border border-border/50 bg-muted/50 p-3 text-xs">
+          <pre className="max-h-64 overflow-auto rounded border border-border bg-muted/50 p-3 text-xs">
             {request.commandOutput}
           </pre>
         </Section>
@@ -208,7 +208,7 @@ function QueueRequestTab({ request, className }: { request: ClockworkRequest; cl
 
       {request.jobPayload != null && (
         <Section title="Payload">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={{ payload: request.jobPayload }} />
           </div>
         </Section>
@@ -216,7 +216,7 @@ function QueueRequestTab({ request, className }: { request: ClockworkRequest; cl
 
       {request.jobOptions && Object.keys(request.jobOptions).length > 0 && (
         <Section title="Options">
-          <div className="rounded border border-border/50">
+          <div className="rounded border border-border">
             <KeyValueTable data={request.jobOptions} />
           </div>
         </Section>
@@ -251,7 +251,7 @@ function TestRequestTab({ request, className }: { request: ClockworkRequest; cla
 
       {request.testStatusMessage && (
         <Section title="Status Message">
-          <pre className="whitespace-pre-wrap rounded border border-border/50 bg-muted/50 p-3 text-xs">
+          <pre className="whitespace-pre-wrap rounded border border-border bg-muted/50 p-3 text-xs">
             {request.testStatusMessage}
           </pre>
         </Section>

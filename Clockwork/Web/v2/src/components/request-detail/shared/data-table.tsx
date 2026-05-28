@@ -63,27 +63,15 @@ export function DataTable<T extends Record<string, any>>({
             {columns.map((col) => (
               <TableHead
                 key={col.key}
-                className={cn(
-                  'whitespace-nowrap',
-                  col.sortable && 'cursor-pointer select-none hover:text-foreground',
-                  col.className,
-                )}
+                className={cn('whitespace-nowrap', col.sortable && 'cursor-pointer select-none hover:text-foreground', col.className)}
                 onClick={col.sortable ? () => handleSort(col.key) : undefined}
               >
                 <span className="inline-flex items-center gap-1">
                   {col.header}
                   {col.sortable && (
-                    <span className="text-xs">
-                      {sortKey === col.key ? (
-                        sortDir === 'asc' ? (
-                          <ArrowUp className="h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-40" />
-                      )}
-                    </span>
+                    sortKey === col.key
+                      ? (sortDir === 'asc' ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)
+                      : <ArrowUpDown className="size-3 opacity-40" />
                   )}
                 </span>
               </TableHead>
@@ -99,11 +87,7 @@ export function DataTable<T extends Record<string, any>>({
             </TableRow>
           ) : (
             sortedData.map((row, i) => (
-              <TableRow
-                key={i}
-                onClick={onRowClick ? () => onRowClick(row, i) : undefined}
-                className={cn(onRowClick && 'cursor-pointer')}
-              >
+              <TableRow key={i} onClick={onRowClick ? () => onRowClick(row, i) : undefined} className={cn(onRowClick && 'cursor-pointer')}>
                 {columns.map((col) => (
                   <TableCell key={col.key} className={cn('whitespace-nowrap', col.className)}>
                     {col.render(row)}
