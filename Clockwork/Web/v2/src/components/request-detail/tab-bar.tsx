@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import * as Tabs from '@radix-ui/react-tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export interface TabDef {
   id: string
@@ -17,18 +17,16 @@ interface TabBarProps {
 export function TabBar({ tabs, activeTab, onTabChange, className }: TabBarProps) {
   return (
     <div className={cn('shrink-0 border-b border-border/50', className)}>
-      <Tabs.Root value={activeTab} onValueChange={onTabChange}>
-        <Tabs.List className="flex items-center gap-0 overflow-x-auto px-3">
+      <Tabs value={activeTab} onValueChange={onTabChange}>
+        <TabsList className="h-auto gap-0 rounded-none border-0 bg-transparent p-0">
           {tabs.map((tab) => (
-            <Tabs.Trigger
+            <TabsTrigger
               key={tab.id}
               value={tab.id}
               className={cn(
-                'relative shrink-0 px-3 py-2.5 text-sm font-medium transition-colors duration-150',
+                'relative rounded-none border-b-2 border-transparent px-3 py-2.5 text-sm font-medium',
                 'text-muted-foreground/70 hover:text-foreground/80',
-                'data-[state=active]:text-foreground',
-                'after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[2px] after:rounded-full after:bg-transparent after:content-[""] after:transition-colors duration-150',
-                'data-[state=active]:after:bg-primary',
+                'data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none',
               )}
             >
               <span className="inline-flex items-center gap-1.5">
@@ -39,10 +37,10 @@ export function TabBar({ tabs, activeTab, onTabChange, className }: TabBarProps)
                   </span>
                 )}
               </span>
-            </Tabs.Trigger>
+            </TabsTrigger>
           ))}
-        </Tabs.List>
-      </Tabs.Root>
+        </TabsList>
+      </Tabs>
     </div>
   )
 }

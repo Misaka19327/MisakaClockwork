@@ -1,6 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export interface DataTableColumn<T> {
   key: string
@@ -49,14 +57,14 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <div className={cn('overflow-x-auto', className)}>
-      <table className="w-full border-collapse text-left text-sm">
-        <thead>
-          <tr className="border-b border-border/50 bg-muted/30">
+      <Table>
+        <TableHeader>
+          <TableRow>
             {columns.map((col) => (
-              <th
+              <TableHead
                 key={col.key}
                 className={cn(
-                  'whitespace-nowrap px-3 py-2 font-medium text-muted-foreground',
+                  'whitespace-nowrap',
                   col.sortable && 'cursor-pointer select-none hover:text-foreground',
                   col.className,
                 )}
@@ -78,43 +86,34 @@ export function DataTable<T extends Record<string, any>>({
                     </span>
                   )}
                 </span>
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {sortedData.length === 0 ? (
-            <tr>
-              <td
-                colSpan={columns.length}
-                className="px-3 py-8 text-center text-muted-foreground"
-              >
+            <TableRow>
+              <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
                 {emptyMessage}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : (
             sortedData.map((row, i) => (
-              <tr
+              <TableRow
                 key={i}
                 onClick={onRowClick ? () => onRowClick(row, i) : undefined}
-                className={cn(
-                  'border-b border-border/50 transition-colors last:border-0',
-                  onRowClick && 'cursor-pointer hover:bg-accent/50',
-                )}
+                className={cn(onRowClick && 'cursor-pointer')}
               >
                 {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    className={cn('whitespace-nowrap px-3 py-2', col.className)}
-                  >
+                  <TableCell key={col.key} className={cn('whitespace-nowrap', col.className)}>
                     {col.render(row)}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }

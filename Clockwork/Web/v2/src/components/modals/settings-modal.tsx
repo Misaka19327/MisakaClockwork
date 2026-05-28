@@ -1,10 +1,26 @@
 import { useState, useEffect } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
-import { X, Settings } from 'lucide-react'
+import { Settings, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/i18n'
 import { useSettingsStore, type Locale } from '@/stores/settings-store'
 import type { ThemeMode } from '@/types/clockwork'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 const editors = [
   { value: 'vscode', label: 'VS Code' },
@@ -66,158 +82,129 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border/60 bg-card p-6 shadow-xl"
-        >
-          <Dialog.Title className="flex items-center gap-2 text-lg font-semibold text-foreground">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
             {t('settings.title')}
-          </Dialog.Title>
-          <Dialog.Close asChild>
-            <button
-              type="button"
-              className="absolute right-3 top-3 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </Dialog.Close>
+          </DialogTitle>
+        </DialogHeader>
 
-          <div className="mt-4 space-y-5">
-            {/* Language */}
-            <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.language')}</h3>
-              <div className="space-y-2">
-                {([
-                  { value: 'zh-CN' as Locale, labelKey: 'settings.lang.zhCN' as const },
-                  { value: 'en-US' as Locale, labelKey: 'settings.lang.enUS' as const },
-                ]).map(({ value, labelKey }) => (
-                  <label
-                    key={value}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
-                      locale === value
-                        ? 'border-primary bg-primary/5 text-foreground'
-                        : 'border-border text-muted-foreground hover:border-primary/50',
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="locale"
-                      value={value}
-                      checked={locale === value}
-                      onChange={() => setLocale(value)}
-                      className="accent-primary"
-                    />
-                    <span>{t(labelKey)}</span>
-                  </label>
-                ))}
-              </div>
-            </section>
+        <div className="space-y-5">
+          {/* Language */}
+          <section>
+            <Label className="mb-2 block text-sm font-medium">{t('settings.language')}</Label>
+            <div className="space-y-2">
+              {([
+                { value: 'zh-CN' as Locale, labelKey: 'settings.lang.zhCN' as const },
+                { value: 'en-US' as Locale, labelKey: 'settings.lang.enUS' as const },
+              ]).map(({ value, labelKey }) => (
+                <label
+                  key={value}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+                    locale === value
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-primary/50',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="locale"
+                    value={value}
+                    checked={locale === value}
+                    onChange={() => setLocale(value)}
+                    className="accent-primary"
+                  />
+                  <span>{t(labelKey)}</span>
+                </label>
+              ))}
+            </div>
+          </section>
 
-            {/* Appearance */}
-            <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.appearance')}</h3>
-              <div className="space-y-2">
-                {(['light', 'dark', 'system'] as ThemeMode[]).map((mode) => (
-                  <label
-                    key={mode}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
-                      theme === mode
-                        ? 'border-primary bg-primary/5 text-foreground'
-                        : 'border-border text-muted-foreground hover:border-primary/50',
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="theme"
-                      value={mode}
-                      checked={theme === mode}
-                      onChange={() => setTheme(mode)}
-                      className="accent-primary"
-                    />
-                    <span className="capitalize">{mode}</span>
-                    {mode === 'system' && (
-                      <span className="text-xs text-muted-foreground">
-                        {t('settings.systemFollow')}
-                      </span>
-                    )}
-                  </label>
-                ))}
-              </div>
-            </section>
+          {/* Appearance */}
+          <section>
+            <Label className="mb-2 block text-sm font-medium">{t('settings.appearance')}</Label>
+            <div className="space-y-2">
+              {(['light', 'dark', 'system'] as ThemeMode[]).map((mode) => (
+                <label
+                  key={mode}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+                    theme === mode
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-primary/50',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="theme"
+                    value={mode}
+                    checked={theme === mode}
+                    onChange={() => setTheme(mode)}
+                    className="accent-primary"
+                  />
+                  <span className="capitalize">{mode}</span>
+                  {mode === 'system' && (
+                    <span className="text-xs text-muted-foreground">{t('settings.systemFollow')}</span>
+                  )}
+                </label>
+              ))}
+            </div>
+          </section>
 
-            {/* Editor */}
-            <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.editor')}</h3>
-              <select
-                value={editor}
-                onChange={(e) => setEditor(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-              >
+          {/* Editor */}
+          <section>
+            <Label className="mb-2 block text-sm font-medium">{t('settings.editor')}</Label>
+            <Select value={editor} onValueChange={setEditor}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
                 {editors.map((ed) => (
-                  <option key={ed.value} value={ed.value}>
-                    {ed.label}
-                  </option>
+                  <SelectItem key={ed.value} value={ed.value}>{ed.label}</SelectItem>
                 ))}
-              </select>
-            </section>
+              </SelectContent>
+            </Select>
+          </section>
 
-            {/* Local Path Mapping */}
-            <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.localPathMapping')}</h3>
-              <textarea
-                value={draftLocalPathMap}
-                onChange={(e) => setDraftLocalPathMap(e.target.value)}
-                onBlur={handleSaveLocalPathMap}
-                placeholder="/remote/path -> /local/path"
-                rows={3}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono outline-none focus:border-ring focus:ring-1 focus:ring-ring resize-none"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t('settings.localPathMappingDesc')}
-              </p>
-            </section>
+          {/* Local Path Mapping */}
+          <section>
+            <Label className="mb-2 block text-sm font-medium">{t('settings.localPathMapping')}</Label>
+            <textarea
+              value={draftLocalPathMap}
+              onChange={(e) => setDraftLocalPathMap(e.target.value)}
+              onBlur={handleSaveLocalPathMap}
+              placeholder="/remote/path -> /local/path"
+              rows={3}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono outline-none focus:ring-1 focus:ring-ring resize-none"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">{t('settings.localPathMappingDesc')}</p>
+          </section>
 
-            {/* Metadata Path */}
-            <section>
-              <h3 className="mb-2 text-sm font-medium text-foreground">{t('settings.metadataPath')}</h3>
-              <input
-                type="text"
-                value={draftMetadataPath}
-                onChange={(e) => setDraftMetadataPath(e.target.value)}
-                onBlur={() => setMetadataPath(draftMetadataPath)}
-                placeholder="/path/to/clockwork/metadata"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t('settings.metadataPathDesc')}
-              </p>
-            </section>
-          </div>
+          {/* Metadata Path */}
+          <section>
+            <Label className="mb-2 block text-sm font-medium">{t('settings.metadataPath')}</Label>
+            <Input
+              value={draftMetadataPath}
+              onChange={(e) => setDraftMetadataPath(e.target.value)}
+              onBlur={() => setMetadataPath(draftMetadataPath)}
+              placeholder="/path/to/clockwork/metadata"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">{t('settings.metadataPathDesc')}</p>
+          </section>
+        </div>
 
-          {/* Actions */}
-          <div className="mt-6 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-            >
-              {t('settings.cancel')}
-            </button>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              {t('settings.save')}
-            </button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('settings.cancel')}
+          </Button>
+          <Button onClick={() => onOpenChange(false)}>
+            {t('settings.save')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
