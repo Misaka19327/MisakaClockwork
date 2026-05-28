@@ -93,6 +93,8 @@ const zhCN = {
   'badge.duration': '耗时',
   'badge.method': '方法',
   'badge.search': '搜索',
+  'badge.timeStart': '开始时间',
+  'badge.timeEnd': '结束时间',
 } as const
 
 export default zhCN

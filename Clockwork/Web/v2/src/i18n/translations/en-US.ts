@@ -95,6 +95,8 @@ const enUS: Record<TranslationKey, string> = {
   'badge.duration': 'Duration',
   'badge.method': 'Method',
   'badge.search': 'Search',
+  'badge.timeStart': 'Start',
+  'badge.timeEnd': 'End',
 }
 
 export default enUS
