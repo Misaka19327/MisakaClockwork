@@ -14,11 +14,12 @@ interface SplitViewProps {
 }
 
 const BREAKPOINT = 900
-const DESKTOP_PANEL_MIN = 340
-const DESKTOP_PANEL_MAX = 620
+const DESKTOP_PANEL_MIN = 420
+const DESKTOP_PANEL_MAX = 760
+const DESKTOP_PANEL_ANIMATION_MS = 260
 
 function getDesktopLeftPanelWidth(viewportWidth: number) {
-  return Math.min(Math.max(Math.round(viewportWidth * 0.34), 420), 540)
+  return Math.min(Math.max(Math.round(viewportWidth * 0.4), 520), 700)
 }
 
 export function SplitView({
@@ -28,9 +29,57 @@ export function SplitView({
 }: SplitViewProps) {
   const leftPanelRef = useRef<PanelImperativeHandle | null>(null)
   const rightPanelRef = useRef<PanelImperativeHandle | null>(null)
+  const groupElementRef = useRef<HTMLDivElement | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const collapseTimeoutRef = useRef<number | null>(null)
   const [isMobile, setIsMobile] = useState(
     () => window.innerWidth < BREAKPOINT,
   )
+
+  const stopAnimation = () => {
+    if (animationFrameRef.current != null) {
+      window.cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+    if (collapseTimeoutRef.current != null) {
+      window.clearTimeout(collapseTimeoutRef.current)
+      collapseTimeoutRef.current = null
+    }
+  }
+
+  const animateLeftPanelTo = (targetWidth: number) => {
+    stopAnimation()
+
+    const panel = leftPanelRef.current
+    if (!panel) return
+
+    const startWidth = panel.getSize().inPixels
+    const delta = targetWidth - startWidth
+
+    if (Math.abs(delta) < 1) {
+      panel.resize(`${targetWidth}px`)
+      return
+    }
+
+    let startTime: number | null = null
+
+    const step = (timestamp: number) => {
+      if (startTime == null) startTime = timestamp
+
+      const progress = Math.min((timestamp - startTime) / DESKTOP_PANEL_ANIMATION_MS, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      panel.resize(`${startWidth + delta * eased}px`)
+
+      if (progress < 1) {
+        animationFrameRef.current = window.requestAnimationFrame(step)
+      } else {
+        panel.resize(`${targetWidth}px`)
+        animationFrameRef.current = null
+      }
+    }
+
+    animationFrameRef.current = window.requestAnimationFrame(step)
+  }
 
   useEffect(() => {
     const handleResize = () => {
@@ -44,18 +93,28 @@ export function SplitView({
     if (isMobile) return
 
     const frame = window.requestAnimationFrame(() => {
+      const groupWidth = groupElementRef.current?.clientWidth ?? window.innerWidth
+
       if (expanded) {
-        rightPanelRef.current?.collapse()
-        leftPanelRef.current?.resize('100%')
+        animateLeftPanelTo(groupWidth)
+        collapseTimeoutRef.current = window.setTimeout(() => {
+          rightPanelRef.current?.collapse()
+          collapseTimeoutRef.current = null
+        }, DESKTOP_PANEL_ANIMATION_MS)
         return
       }
 
       rightPanelRef.current?.expand()
-      leftPanelRef.current?.resize(`${getDesktopLeftPanelWidth(window.innerWidth)}px`)
+      animateLeftPanelTo(getDesktopLeftPanelWidth(groupWidth))
     })
 
-    return () => window.cancelAnimationFrame(frame)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      stopAnimation()
+    }
   }, [expanded, isMobile])
+
+  useEffect(() => () => stopAnimation(), [])
 
   if (isMobile) {
     if (expanded) {
@@ -76,7 +135,11 @@ export function SplitView({
   }
 
   return (
-    <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0">
+    <ResizablePanelGroup
+      orientation="horizontal"
+      className="min-h-0 min-w-0"
+      elementRef={groupElementRef}
+    >
       <ResizablePanel
         id="request-list-panel"
         panelRef={leftPanelRef}
@@ -84,7 +147,7 @@ export function SplitView({
         minSize={`${DESKTOP_PANEL_MIN}px`}
         maxSize={expanded ? '100%' : `${DESKTOP_PANEL_MAX}px`}
         groupResizeBehavior="preserve-pixel-size"
-        className="min-w-[340px] overflow-hidden transition-[flex-grow,flex-basis] duration-300 ease-in-out"
+        className="min-w-[420px] overflow-hidden"
       >
         {leftPanel}
       </ResizablePanel>
@@ -100,10 +163,17 @@ export function SplitView({
         panelRef={rightPanelRef}
         collapsible
         collapsedSize={0}
-        minSize="480px"
-        className="min-w-0 overflow-hidden transition-[flex-grow,flex-basis] duration-300 ease-in-out"
+        minSize={expanded ? '0px' : '480px'}
+        className="min-w-0 overflow-hidden"
       >
-        {rightPanel}
+        <div
+          className={cn(
+            'h-full w-full transition-all duration-300 ease-in-out',
+            expanded ? 'translate-x-3 opacity-0 pointer-events-none' : 'translate-x-0 opacity-100',
+          )}
+        >
+          {rightPanel}
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   )

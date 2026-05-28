@@ -39,7 +39,7 @@ export function RequestList({
   const parentRef = useRef<HTMLDivElement>(null)
   const previousCountRef = useRef(requests.length)
 
-  const rowHeight = compact ? 52 : 36
+  const rowHeight = compact ? 72 : 36
 
   const virtualizer = useVirtualizer({
     count: hasMore ? requests.length + 1 : requests.length,
