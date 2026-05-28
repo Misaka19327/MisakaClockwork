@@ -103,7 +103,7 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
     return (
       <div
         className={cn(
-          'flex h-full w-full min-w-0 items-center justify-center bg-background text-muted-foreground',
+          'flex h-full w-full min-w-0 items-center justify-center bg-background text-muted-foreground transition-opacity duration-200',
           className,
         )}
       >
@@ -115,7 +115,13 @@ export function RequestDetail({ request, className }: RequestDetailProps) {
   }
 
   return (
-    <div className={cn('flex h-full w-full min-w-0 flex-col bg-background', className)}>
+    <div
+      key={request.id}
+      className={cn(
+        'animate-in fade-in slide-in-from-right-2 flex h-full w-full min-w-0 flex-col bg-background duration-200',
+        className,
+      )}
+    >
       {/* Header */}
       <div className="flex min-w-0 shrink-0 items-center gap-3 border-b border-border px-4 py-2.5">
         <MethodBadge method={request.method} />

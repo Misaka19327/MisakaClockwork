@@ -29,17 +29,33 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const selectedId = useRequestStore((s) => s.selectedId)
+  const searchFilters = useRequestStore((s) => s.searchFilters)
+  const oldestId = useRequestStore((s) => s.oldestId)
+  const { isLoading } = useRequestList(searchFilters)
+  const loadOlder = useLoadOlder(oldestId, searchFilters)
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <LayoutInner expanded={selectedId === null} />
+        <LayoutInner
+          expanded={selectedId === null}
+          isLoading={isLoading}
+          onLoadOlder={loadOlder}
+        />
       </ThemeProvider>
     </QueryClientProvider>
   )
 }
 
-function LayoutInner({ expanded }: { expanded: boolean }) {
+function LayoutInner({
+  expanded,
+  isLoading,
+  onLoadOlder,
+}: {
+  expanded: boolean
+  isLoading: boolean
+  onLoadOlder: () => Promise<void>
+}) {
   const locale = useSettingsStore((s) => s.locale)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -63,7 +79,13 @@ function LayoutInner({ expanded }: { expanded: boolean }) {
         {/* Main content */}
         <div className="flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
           <SplitView
-            leftPanel={<LeftPanel expanded={expanded} />}
+            leftPanel={
+              <LeftPanel
+                expanded={expanded}
+                isLoading={isLoading}
+                onLoadOlder={onLoadOlder}
+              />
+            }
             rightPanel={<RightPanel />}
             expanded={expanded}
           />
@@ -74,7 +96,15 @@ function LayoutInner({ expanded }: { expanded: boolean }) {
   )
 }
 
-function LeftPanel({ expanded }: { expanded: boolean }) {
+function LeftPanel({
+  expanded,
+  isLoading,
+  onLoadOlder,
+}: {
+  expanded: boolean
+  isLoading: boolean
+  onLoadOlder: () => Promise<void>
+}) {
   const requests = useRequestStore((s) => s.requests)
   const selectedId = useRequestStore((s) => s.selectedId)
   const selectRequest = useRequestStore((s) => s.selectRequest)
@@ -82,15 +112,12 @@ function LeftPanel({ expanded }: { expanded: boolean }) {
   const setSearchFilters = useRequestStore((s) => s.setSearchFilters)
   const oldestId = useRequestStore((s) => s.oldestId)
 
-  const { isLoading } = useRequestList(searchFilters)
-  const loadOlder = useLoadOlder(oldestId, searchFilters)
-
   return (
     <RequestList
       requests={requests}
       selectedId={selectedId}
       onSelectRequest={(req) => selectRequest(req.id)}
-      onLoadOlder={loadOlder}
+      onLoadOlder={onLoadOlder}
       isLoading={isLoading}
       hasMore={!!oldestId}
       filters={searchFilters}

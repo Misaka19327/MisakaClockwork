@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { formatDuration, formatMemory, formatDateTime, formatTimeOnly, truncate } from '@/utils/format'
+import { formatDuration, formatMemory, formatDateOnly, formatDateTime, formatTimeOnly, truncate } from '@/utils/format'
 import type { ClockworkRequest } from '@/types/clockwork'
 import { AlertTriangle } from 'lucide-react'
 
@@ -207,10 +207,11 @@ export function RequestRow({ request, isSelected, onClick, compact = false, clas
         </div>
 
         <span
-          className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
+          className="shrink-0 text-[10px] tabular-nums text-muted-foreground text-right leading-tight"
           title={formatDateTime(request.time)}
         >
-          {formatTimeOnly(request.time)}
+          <span className="block">{formatDateOnly(request.time)}</span>
+          <span className="block">{formatTimeOnly(request.time)}</span>
         </span>
       </div>
     )

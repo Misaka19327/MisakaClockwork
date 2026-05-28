@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
+import { cn } from '@/lib/utils'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -26,6 +27,7 @@ export function SplitView({
   expanded,
 }: SplitViewProps) {
   const leftPanelRef = useRef<PanelImperativeHandle | null>(null)
+  const rightPanelRef = useRef<PanelImperativeHandle | null>(null)
   const [isMobile, setIsMobile] = useState(
     () => window.innerWidth < BREAKPOINT,
   )
@@ -39,11 +41,17 @@ export function SplitView({
   }, [])
 
   useEffect(() => {
-    if (isMobile || expanded) return
+    if (isMobile) return
 
-    const width = getDesktopLeftPanelWidth(window.innerWidth)
     const frame = window.requestAnimationFrame(() => {
-      leftPanelRef.current?.resize(`${width}px`)
+      if (expanded) {
+        rightPanelRef.current?.collapse()
+        leftPanelRef.current?.resize('100%')
+        return
+      }
+
+      rightPanelRef.current?.expand()
+      leftPanelRef.current?.resize(`${getDesktopLeftPanelWidth(window.innerWidth)}px`)
     })
 
     return () => window.cancelAnimationFrame(frame)
@@ -67,10 +75,6 @@ export function SplitView({
     )
   }
 
-  if (expanded) {
-    return <div className="h-full w-full min-w-0 overflow-hidden">{leftPanel}</div>
-  }
-
   return (
     <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0">
       <ResizablePanel
@@ -80,15 +84,24 @@ export function SplitView({
         minSize={`${DESKTOP_PANEL_MIN}px`}
         maxSize={`${DESKTOP_PANEL_MAX}px`}
         groupResizeBehavior="preserve-pixel-size"
-        className="min-w-[320px] overflow-hidden"
+        className="min-w-[320px] overflow-hidden transition-[flex-grow] duration-300 ease-out"
       >
         {leftPanel}
       </ResizablePanel>
-      <ResizableHandle withHandle className="bg-border hover:bg-primary/50" />
+      <ResizableHandle
+        withHandle
+        className={cn(
+          'bg-border transition-opacity duration-200',
+          expanded ? 'pointer-events-none opacity-0' : 'opacity-100 hover:bg-primary/50',
+        )}
+      />
       <ResizablePanel
         id="request-detail-panel"
+        panelRef={rightPanelRef}
+        collapsible
+        collapsedSize={0}
         minSize="480px"
-        className="min-w-0 overflow-hidden"
+        className="min-w-0 overflow-hidden transition-[flex-grow] duration-300 ease-out"
       >
         {rightPanel}
       </ResizablePanel>
