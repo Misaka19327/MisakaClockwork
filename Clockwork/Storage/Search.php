@@ -116,19 +116,28 @@ class Search
 	}
 
 	// Check if the value matches date type search parameter
+	// Multiple constraints are ANDed — a time range [>start, <end] requires both to hold
 	protected function matchesDate($inputs, $value)
 	{
 		if (! count($inputs)) return true;
 
+		$min = null;
+		$max = null;
+
 		foreach ($inputs as $input) {
 			if (preg_match('/^<(.+)$/', $input, $match)) {
-				if ($value < strtotime($match[1])) return true;
+				$ts = (int) $match[1];
+				if ($max === null || $ts < $max) $max = $ts;
 			} elseif (preg_match('/^>(.+)$/', $input, $match)) {
-				if ($value > strtotime($match[1])) return true;
+				$ts = (int) $match[1];
+				if ($min === null || $ts > $min) $min = $ts;
 			}
 		}
 
-		return false;
+		if ($min !== null && $value <= $min) return false;
+		if ($max !== null && $value >= $max) return false;
+
+		return ($min !== null || $max !== null);
 	}
 
 	// Check if the value matches exact type search parameter

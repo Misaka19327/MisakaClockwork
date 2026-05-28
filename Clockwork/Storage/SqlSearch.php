@@ -70,24 +70,33 @@ class SqlSearch extends Search
 	}
 
 	// Resolve a date type condition and bindings
+	// Multiple constraints are ANDed — a time range [>start, <end] requires both to hold
 	protected function resolveDateCondition($fields, $inputs)
 	{
 		if (! count($inputs)) return null;
 
 		$bindings = [];
-		$conditions = implode(' OR ', array_map(function ($field) use ($inputs, &$bindings) {
-			return implode(' OR ', array_map(function ($input, $index) use ($field, &$bindings) {
-				if (preg_match('/^<(.+)$/', $input, $match)) {
-					$bindings["{$field}{$index}"] = $match[1];
-					return $this->quote($field) . " < :{$field}{$index}";
-				} elseif (preg_match('/^>(.+)$/', $input, $match)) {
-					$bindings["{$field}{$index}"] = $match[1];
-					return $this->quote($field). " > :{$field}{$index}";
-				}
-			}, $inputs, array_keys($inputs)));
-		}, $fields));
+		$minConditions = [];
+		$maxConditions = [];
 
-		return [ "({$conditions})", $bindings ];
+		foreach ($inputs as $index => $input) {
+			foreach ($fields as $field) {
+				if (preg_match('/^<(.+)$/', $input, $match)) {
+					$key = "{$field}_{$index}_max";
+					$bindings[$key] = $match[1];
+					$maxConditions[] = $this->quote($field) . " < :{$key}";
+				} elseif (preg_match('/^>(.+)$/', $input, $match)) {
+					$key = "{$field}_{$index}_min";
+					$bindings[$key] = $match[1];
+					$minConditions[] = $this->quote($field) . " > :{$key}";
+				}
+			}
+		}
+
+		$allConditions = array_merge($minConditions, $maxConditions);
+		if (empty($allConditions)) return null;
+
+		return [ '(' . implode(' AND ', $allConditions) . ')', $bindings ];
 	}
 
 	// Resolve an exact type condition and bindings
