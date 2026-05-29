@@ -17,8 +17,14 @@ const zhCN = {
 
   // Filters
   'filter.search': '搜索路径、名称...',
-  'filter.uri': 'URI',
-  'filter.controller': '控制器',
+  'filter.searchHint': '支持模糊搜索路径、处理器和名称',
+  'filter.polling': '轮询',
+  'filter.pollingOn': '已开启',
+  'filter.pollingOff': '已关闭',
+  'filter.active': '已选',
+  'filter.clear': '清空',
+  'filter.uri': '路径',
+  'filter.controller': '处理器',
   'filter.name': '名称',
   'filter.type': '类型',
   'filter.status': '状态码',
@@ -99,8 +105,8 @@ const zhCN = {
   'badge.search': '搜索',
   'badge.timeStart': '开始时间',
   'badge.timeEnd': '结束时间',
-  'badge.uri': 'URI',
-  'badge.controller': '控制器',
+  'badge.uri': '路径',
+  'badge.controller': '处理器',
   'badge.name': '名称',
 } as const
 

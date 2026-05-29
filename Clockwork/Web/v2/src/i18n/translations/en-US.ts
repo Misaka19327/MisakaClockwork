@@ -19,8 +19,14 @@ const enUS: Record<TranslationKey, string> = {
 
   // Filters
   'filter.search': 'Search path and name...',
-  'filter.uri': 'URI',
-  'filter.controller': 'Controller',
+  'filter.searchHint': 'Supports fuzzy search on path, handler and name',
+  'filter.polling': 'Polling',
+  'filter.pollingOn': 'On',
+  'filter.pollingOff': 'Off',
+  'filter.active': 'Active',
+  'filter.clear': 'Clear',
+  'filter.uri': 'Path',
+  'filter.controller': 'Handler',
   'filter.name': 'Name',
   'filter.type': 'Type',
   'filter.status': 'Status',
@@ -101,8 +107,8 @@ const enUS: Record<TranslationKey, string> = {
   'badge.search': 'Search',
   'badge.timeStart': 'Start',
   'badge.timeEnd': 'End',
-  'badge.uri': 'URI',
-  'badge.controller': 'Controller',
+  'badge.uri': 'Path',
+  'badge.controller': 'Handler',
   'badge.name': 'Name',
 }
 
