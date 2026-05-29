@@ -50,6 +50,28 @@ Congratulations, you are done! To enable more features like commands or queue jo
 
 Read [full installation instructions](https://underground.works/clockwork/#docs-installation) on the Clockwork website.
 
+### MCP server
+
+This repository now includes a local MCP server entrypoint at `bin/clockwork-mcp.php`.
+
+It exposes Clockwork metadata as MCP tools over `stdio`, so AI clients can connect directly to stored request data without going through the browser UI.
+
+By default, the server reads Clockwork file storage from:
+
+- `CLOCKWORK_MCP_STORAGE_PATH` if set
+- `storage/clockwork`
+- `tmp_clockwork_storage`
+
+Start it manually with:
+
+```bash
+php bin/clockwork-mcp.php
+```
+
+The project also includes a sample MCP client config at `.ai/mcp/mcp.json`.
+
+If `php` is not available on your PATH, change the MCP client command to your local PHP executable path.
+
 ### Features
 
 #### Collecting data

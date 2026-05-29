@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "clockwork": {
+      "command": "php",
+      "args": [
+        "bin/clockwork-mcp.php"
+      ]
+    }
+  }
+}
