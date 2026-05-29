@@ -1,18 +1,32 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { client } from './client'
 import { useRequestStore } from '@/stores/request-store'
+import { useSettingsStore } from '@/stores/settings-store'
 import type { ClockworkRequest, SearchFilters } from '@/types/clockwork'
 
 export function useRequestList(filters: SearchFilters) {
   const setRequests = useRequestStore((s) => s.setRequests)
   const prependRequests = useRequestStore((s) => s.prependRequests)
   const requests = useRequestStore((s) => s.requests)
+  const pollingEnabled = useSettingsStore((s) => s.pollingEnabled)
+  const pollingInterval = useSettingsStore((s) => s.pollingInterval)
   const [initialized, setInitialized] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollingBusyRef = useRef(false)
+  const latestStateRef = useRef<{ requests: ClockworkRequest[]; filters: SearchFilters }>({
+    requests: [],
+    filters,
+  })
 
   // Stable key derived from filters content — avoids spurious re-runs on new object identity
   const filtersKey = JSON.stringify(filters)
+  const intervalMs = useMemo(() => Number(pollingInterval), [pollingInterval])
+
+  useEffect(() => {
+    latestStateRef.current = { requests, filters }
+  }, [requests, filters])
 
   // Bootstrap: load latest + one page of older. Re-runs when filters change.
   useEffect(() => {
@@ -53,29 +67,41 @@ export function useRequestList(filters: SearchFilters) {
     return () => { cancelled = true }
   }, [filtersKey]) // Re-run on filter change
 
-  // Poll for new requests every 1 second
+  // Poll for new requests on the configured cadence
   useEffect(() => {
-    if (!initialized) return
+    if (!initialized || !pollingEnabled || !intervalMs) {
+      setIsPolling(false)
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      intervalRef.current = null
+      return
+    }
 
+    setIsPolling(true)
     intervalRef.current = setInterval(async () => {
-      if (requests.length === 0) return
+      const { requests: currentRequests, filters: currentFilters } = latestStateRef.current
+      if (currentRequests.length === 0 || pollingBusyRef.current) return
+      pollingBusyRef.current = true
       try {
-        const newest = requests[0]
-        const newReqs = await client.fetchNext(newest.id, 50, filters)
+        const newest = currentRequests[0]
+        const newReqs = await client.fetchNext(newest.id, 50, currentFilters)
         if (newReqs.length > 0) {
           prependRequests(newReqs)
         }
       } catch {
         // ignore polling errors
+      } finally {
+        pollingBusyRef.current = false
       }
-    }, 1000)
+    }, Math.max(1000, intervalMs))
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
+      intervalRef.current = null
+      pollingBusyRef.current = false
     }
-  }, [initialized, requests.length, filtersKey, prependRequests])
+  }, [initialized, filtersKey, prependRequests, pollingEnabled, intervalMs])
 
-  return { isLoading: !initialized }
+  return { isLoading: !initialized, isPolling, pollingEnabled, pollingInterval }
 }
 
 export function useLoadOlder(

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Search, X, CalendarIcon } from 'lucide-react'
 import { format } from 'date-fns'
@@ -36,9 +36,31 @@ function parseTime(v: string): { h: number; m: number } | null {
   return { h, m }
 }
 
+function serializeList(values?: string[]): string {
+  return values?.join(', ') ?? ''
+}
+
+function parseList(value: string): string[] | undefined {
+  const items = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  return items.length > 0 ? items : undefined
+}
+
 export function FilterBar({ filters, onFiltersChange, className }: FilterBarProps) {
   const { t } = useTranslation()
   const [searchInput, setSearchInput] = useState(filters.search ?? '')
+  const [uriInput, setUriInput] = useState(serializeList(filters.uri))
+  const [controllerInput, setControllerInput] = useState(serializeList(filters.controller))
+  const [nameInput, setNameInput] = useState(serializeList(filters.name))
+
+  useEffect(() => {
+    setSearchInput(filters.search ?? '')
+    setUriInput(serializeList(filters.uri))
+    setControllerInput(serializeList(filters.controller))
+    setNameInput(serializeList(filters.name))
+  }, [filters.search, filters.uri, filters.controller, filters.name])
 
   const update = useCallback(
     (key: string, value: string | string[] | undefined) =>
@@ -48,7 +70,8 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
 
   const active =
     filters.search || filters.type?.length || filters.status?.length ||
-    filters.durationRange || filters.timeStart || filters.timeEnd || filters.method?.length
+    filters.durationRange || filters.timeStart || filters.timeEnd || filters.method?.length ||
+    filters.uri?.length || filters.controller?.length || filters.name?.length
 
   const startDate = filters.timeStart ? new Date(filters.timeStart) : undefined
   const endDate = filters.timeEnd ? new Date(filters.timeEnd) : undefined
@@ -126,6 +149,39 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
             </SelectGroup>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <Input
+          value={uriInput}
+          onChange={(e) => {
+            const value = e.target.value
+            setUriInput(value)
+            update('uri', parseList(value))
+          }}
+          placeholder={t('filter.uri')}
+          className="h-8 min-w-[160px] flex-1 text-xs"
+        />
+        <Input
+          value={controllerInput}
+          onChange={(e) => {
+            const value = e.target.value
+            setControllerInput(value)
+            update('controller', parseList(value))
+          }}
+          placeholder={t('filter.controller')}
+          className="h-8 min-w-[160px] flex-1 text-xs"
+        />
+        <Input
+          value={nameInput}
+          onChange={(e) => {
+            const value = e.target.value
+            setNameInput(value)
+            update('name', parseList(value))
+          }}
+          placeholder={t('filter.name')}
+          className="h-8 min-w-[160px] flex-1 text-xs"
+        />
 
         {/* Start date */}
         <Popover>
@@ -215,7 +271,18 @@ export function FilterBar({ filters, onFiltersChange, className }: FilterBarProp
 
         {/* Clear */}
         {active && (
-          <Button variant="ghost" size="icon" onClick={() => { setSearchInput(''); onFiltersChange({}) }} className="size-8 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setSearchInput('')
+              setUriInput('')
+              setControllerInput('')
+              setNameInput('')
+              onFiltersChange({})
+            }}
+            className="size-8 shrink-0"
+          >
             <X />
           </Button>
         )}

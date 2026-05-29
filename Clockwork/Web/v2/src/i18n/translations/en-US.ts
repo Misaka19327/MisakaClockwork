@@ -18,7 +18,10 @@ const enUS: Record<TranslationKey, string> = {
   'column.handler': 'Handler',
 
   // Filters
-  'filter.search': 'Search path, name, logs...',
+  'filter.search': 'Search path and name...',
+  'filter.uri': 'URI',
+  'filter.controller': 'Controller',
+  'filter.name': 'Name',
   'filter.type': 'Type',
   'filter.status': 'Status',
   'filter.duration': 'Duration',
@@ -74,6 +77,7 @@ const enUS: Record<TranslationKey, string> = {
   'settings.theme': 'Theme',
   'settings.appearance': 'Appearance',
   'settings.editor': 'Editor',
+  'settings.polling': 'Polling',
   'settings.localPathMapping': 'Local Path Mapping',
   'settings.localPathMappingDesc': 'Map remote paths to local paths for file links',
   'settings.metadataPath': 'Metadata Path',
@@ -97,6 +101,9 @@ const enUS: Record<TranslationKey, string> = {
   'badge.search': 'Search',
   'badge.timeStart': 'Start',
   'badge.timeEnd': 'End',
+  'badge.uri': 'URI',
+  'badge.controller': 'Controller',
+  'badge.name': 'Name',
 }
 
 export default enUS

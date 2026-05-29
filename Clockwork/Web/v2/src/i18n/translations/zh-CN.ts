@@ -16,7 +16,10 @@ const zhCN = {
   'column.handler': '处理器',
 
   // Filters
-  'filter.search': '搜索路径、名称、日志...',
+  'filter.search': '搜索路径、名称...',
+  'filter.uri': 'URI',
+  'filter.controller': '控制器',
+  'filter.name': '名称',
   'filter.type': '类型',
   'filter.status': '状态码',
   'filter.duration': '耗时',
@@ -72,6 +75,7 @@ const zhCN = {
   'settings.theme': '主题',
   'settings.appearance': '外观',
   'settings.editor': '编辑器',
+  'settings.polling': '轮询',
   'settings.localPathMapping': '本地路径映射',
   'settings.localPathMappingDesc': '将远程路径映射到本地路径以打开文件链接',
   'settings.metadataPath': '元数据路径',
@@ -95,6 +99,9 @@ const zhCN = {
   'badge.search': '搜索',
   'badge.timeStart': '开始时间',
   'badge.timeEnd': '结束时间',
+  'badge.uri': 'URI',
+  'badge.controller': '控制器',
+  'badge.name': '名称',
 } as const
 
 export default zhCN

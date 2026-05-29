@@ -3,10 +3,11 @@ import { Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/i18n'
 import { useSettingsStore, type Locale } from '@/stores/settings-store'
-import type { ThemeMode } from '@/types/clockwork'
+import type { PollingIntervalOption, ThemeMode } from '@/types/clockwork'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -25,6 +26,23 @@ const editors = [
   { value: 'idea', label: 'IntelliJ IDEA' },
 ]
 
+const pollingIntervals: { value: PollingIntervalOption; label: string }[] = [
+  { value: '1000', label: '1 秒' },
+  { value: '5000', label: '5 秒' },
+  { value: '10000', label: '10 秒' },
+  { value: '30000', label: '30 秒' },
+  { value: '60000', label: '1 分钟' },
+  { value: '120000', label: '2 分钟' },
+  { value: '180000', label: '3 分钟' },
+  { value: '240000', label: '4 分钟' },
+  { value: '300000', label: '5 分钟' },
+  { value: '360000', label: '6 分钟' },
+  { value: '420000', label: '7 分钟' },
+  { value: '480000', label: '8 分钟' },
+  { value: '540000', label: '9 分钟' },
+  { value: '600000', label: '10 分钟' },
+]
+
 interface SettingsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -37,6 +55,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const localPathMap = useSettingsStore((s) => s.localPathMap); const setLocalPathMap = useSettingsStore((s) => s.setLocalPathMap)
   const metadataPath = useSettingsStore((s) => s.metadataPath); const setMetadataPath = useSettingsStore((s) => s.setMetadataPath)
   const locale = useSettingsStore((s) => s.locale); const setLocale = useSettingsStore((s) => s.setLocale)
+  const pollingEnabled = useSettingsStore((s) => s.pollingEnabled); const setPollingEnabled = useSettingsStore((s) => s.setPollingEnabled)
+  const pollingInterval = useSettingsStore((s) => s.pollingInterval); const setPollingInterval = useSettingsStore((s) => s.setPollingInterval)
 
   const [draftPathMap, setDraftPathMap] = useState('')
   const [draftMeta, setDraftMeta] = useState('')
@@ -114,6 +134,26 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               <SelectContent>
                 <SelectGroup>
                   {editors.map((ed) => <SelectItem key={ed.value} value={ed.value}>{ed.label}</SelectItem>)}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </section>
+
+          {/* Polling */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <Label className="text-sm font-medium">{t('settings.polling')}</Label>
+              <Switch checked={pollingEnabled} onCheckedChange={setPollingEnabled} />
+            </div>
+            <Select value={pollingInterval} onValueChange={(value) => setPollingInterval(value as PollingIntervalOption)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {pollingIntervals.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
                 </SelectGroup>
               </SelectContent>
             </Select>
