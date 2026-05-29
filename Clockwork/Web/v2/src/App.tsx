@@ -31,7 +31,7 @@ export default function App() {
   const selectedId = useRequestStore((s) => s.selectedId)
   const searchFilters = useRequestStore((s) => s.searchFilters)
   const oldestId = useRequestStore((s) => s.oldestId)
-  const { isLoading } = useRequestList(searchFilters)
+  const { isLoading, isPolling, pollingEnabled, pollingInterval } = useRequestList(searchFilters)
   const loadOlder = useLoadOlder(oldestId, searchFilters)
 
   return (
@@ -40,6 +40,9 @@ export default function App() {
         <LayoutInner
           expanded={selectedId === null}
           isLoading={isLoading}
+          isPolling={isPolling}
+          pollingEnabled={pollingEnabled}
+          pollingInterval={pollingInterval}
           onLoadOlder={loadOlder}
         />
       </ThemeProvider>
@@ -50,10 +53,16 @@ export default function App() {
 function LayoutInner({
   expanded,
   isLoading,
+  isPolling,
+  pollingEnabled,
+  pollingInterval,
   onLoadOlder,
 }: {
   expanded: boolean
   isLoading: boolean
+  isPolling: boolean
+  pollingEnabled: boolean
+  pollingInterval: string
   onLoadOlder: () => Promise<void>
 }) {
   const locale = useSettingsStore((s) => s.locale)
@@ -65,6 +74,10 @@ function LayoutInner({
         {/* Top bar */}
         <div className="flex h-10 shrink-0 items-center border-b border-border/70 bg-sidebar-background/50 px-4">
           <span className="text-[13px] font-semibold tracking-tight text-foreground/90">MisakaClockWork</span>
+          <span className="ml-3 text-xs text-muted-foreground">
+            {pollingEnabled ? `Polling ${Number(pollingInterval) / 1000}s` : 'Polling off'}
+            {isPolling ? ' · live' : ''}
+          </span>
           <div className="flex-1" />
           <Button
             type="button"

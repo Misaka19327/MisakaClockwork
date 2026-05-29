@@ -17,6 +17,9 @@ const filterLabelMap: Record<string, string> = {
   search: 'badge.search',
   timeStart: 'badge.timeStart',
   timeEnd: 'badge.timeEnd',
+  uri: 'badge.uri',
+  controller: 'badge.controller',
+  name: 'badge.name',
 }
 
 const tagColors: Record<string, string> = {

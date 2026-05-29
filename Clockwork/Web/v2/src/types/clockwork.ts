@@ -257,6 +257,22 @@ export interface SearchFilters {
   time?: string[]
 }
 
+export type PollingIntervalOption =
+  | '1000'
+  | '5000'
+  | '10000'
+  | '30000'
+  | '60000'
+  | '120000'
+  | '180000'
+  | '240000'
+  | '300000'
+  | '360000'
+  | '420000'
+  | '480000'
+  | '540000'
+  | '600000'
+
 export interface EventDetails {
   entrypoint?: any
   parameters?: any

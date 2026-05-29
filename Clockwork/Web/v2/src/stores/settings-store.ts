@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ThemeMode } from '@/types/clockwork'
+import type { PollingIntervalOption, ThemeMode } from '@/types/clockwork'
 
 const STORAGE_KEY = 'clockwork-settings'
 
@@ -12,6 +12,8 @@ interface SettingsState {
   metadataPath: string
   showContext: boolean
   locale: Locale
+  pollingEnabled: boolean
+  pollingInterval: PollingIntervalOption
 
   setTheme: (theme: ThemeMode) => void
   setEditor: (editor: string) => void
@@ -19,6 +21,8 @@ interface SettingsState {
   setMetadataPath: (path: string) => void
   setShowContext: (value: boolean) => void
   setLocale: (locale: Locale) => void
+  setPollingEnabled: (value: boolean) => void
+  setPollingInterval: (value: PollingIntervalOption) => void
 }
 
 interface StoredSettings {
@@ -28,6 +32,8 @@ interface StoredSettings {
   metadataPath?: string
   showContext?: boolean
   locale?: Locale
+  pollingEnabled?: boolean
+  pollingInterval?: PollingIntervalOption
 }
 
 function loadSettings(): StoredSettings {
@@ -51,6 +57,8 @@ function persistState(state: SettingsState): void {
       metadataPath: state.metadataPath,
       showContext: state.showContext,
       locale: state.locale,
+      pollingEnabled: state.pollingEnabled,
+      pollingInterval: state.pollingInterval,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   } catch {
@@ -67,6 +75,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   metadataPath: stored.metadataPath ?? '',
   showContext: stored.showContext ?? true,
   locale: stored.locale ?? 'zh-CN',
+  pollingEnabled: stored.pollingEnabled ?? true,
+  pollingInterval: stored.pollingInterval ?? '5000',
 
   setTheme: (theme) => {
     set({ theme })
@@ -75,6 +85,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setLocale: (locale) => {
     set({ locale })
+    persistState(get())
+  },
+
+  setPollingEnabled: (pollingEnabled) => {
+    set({ pollingEnabled })
+    persistState(get())
+  },
+
+  setPollingInterval: (pollingInterval) => {
+    set({ pollingInterval })
     persistState(get())
   },
 
