@@ -12,7 +12,6 @@ export function useRequestList(filters: SearchFilters) {
   const pollingEnabled = useSettingsStore((s) => s.pollingEnabled)
   const pollingInterval = useSettingsStore((s) => s.pollingInterval)
   const [initialized, setInitialized] = useState(false)
-  const [isPolling, setIsPolling] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollingBusyRef = useRef(false)
   const latestStateRef = useRef<{ requests: ClockworkRequest[]; filters: SearchFilters }>({
@@ -70,13 +69,11 @@ export function useRequestList(filters: SearchFilters) {
   // Poll for new requests on the configured cadence
   useEffect(() => {
     if (!initialized || !pollingEnabled || !intervalMs) {
-      setIsPolling(false)
       if (intervalRef.current) clearInterval(intervalRef.current)
       intervalRef.current = null
       return
     }
 
-    setIsPolling(true)
     intervalRef.current = setInterval(async () => {
       const { requests: currentRequests, filters: currentFilters } = latestStateRef.current
       if (currentRequests.length === 0 || pollingBusyRef.current) return
@@ -101,7 +98,7 @@ export function useRequestList(filters: SearchFilters) {
     }
   }, [initialized, filtersKey, prependRequests, pollingEnabled, intervalMs])
 
-  return { isLoading: !initialized, isPolling, pollingEnabled, pollingInterval }
+  return { isLoading: !initialized }
 }
 
 export function useLoadOlder(
