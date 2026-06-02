@@ -90,16 +90,9 @@ class ClockworkSupport
 	// Retrieve reproduction details for a request by uuid
 	public function getEventDetailsByUuid($uuid)
 	{
-		if (isset($this->app['session'])) $this->app['session.store']->reflash();
+		if ($response = $this->ensureMetadataAccess()) return $response;
 
-		$authenticator = $this->app['clockwork']->authenticator();
 		$storage = $this->app['clockwork']->storage();
-
-		$authenticated = $authenticator->check($this->app['request']->header('X-Clockwork-Auth'));
-
-		if ($authenticated !== true) {
-			return new JsonResponse([ 'message' => $authenticated, 'requires' => $authenticator->requires() ], 403);
-		}
 
 		$request = $storage->findByUuid($uuid);
 
@@ -108,6 +101,92 @@ class ClockworkSupport
 		}
 
 		return new JsonResponse($request->toEventDetails());
+	}
+
+	// Retrieve recent failure summaries for agent-oriented debugging
+	public function getFailures(array $input = [])
+	{
+		if ($response = $this->ensureMetadataAccess()) return $response;
+
+		$limit = max(1, min((int) ($input['limit'] ?? 25), 100));
+		$types = $this->csvInput($input['type'] ?? []);
+		$statuses = $this->csvInput($input['status'] ?? []);
+		$search = trim((string) ($input['search'] ?? ''));
+		$since = isset($input['since']) ? (float) $input['since'] : null;
+
+		$failures = [];
+		$storage = $this->app['clockwork']->storage();
+		$cursor = $storage->latest();
+
+		while ($cursor) {
+			$request = $cursor;
+			$previous = $storage->previous($request->id, 1);
+			$cursor = count($previous) ? $previous[0] : null;
+
+			if (! $this->requestHasFailures($request)) continue;
+			if (count($types) && ! in_array($request->type, $types)) continue;
+			if ($since !== null && $request->time < $since) continue;
+			if (count($statuses) && ! in_array((string) $this->requestStatus($request), $statuses)) continue;
+			if ($search !== '' && ! $this->matchesFailureSearch($request, $search)) continue;
+
+			$summary = $request->toFailureSummary();
+			$failures[] = [
+				'uuid' => $request->uuid,
+				'id' => $request->id,
+				'type' => $request->type,
+				'name' => $summary['name'],
+				'status' => $summary['status'],
+				'receivedAt' => $request->time,
+				'duration' => $request->responseDuration ?? ($request->responseTime ? $request->getResponseDuration() : null),
+				'title' => $summary['title'],
+				'rootMessage' => $summary['rootMessage'],
+				'topAppFrame' => $summary['topAppFrame']
+			];
+
+			if (count($failures) >= $limit) break;
+		}
+
+		return new JsonResponse($failures);
+	}
+
+	// Retrieve a debugging-oriented environment snapshot
+	public function getEnvironmentSnapshot()
+	{
+		if ($response = $this->ensureMetadataAccess()) return $response;
+
+		return new JsonResponse([
+			'appEnv' => $this->app['config']->get('app.env'),
+			'appDebug' => $this->app['config']->get('app.debug'),
+			'phpVersion' => PHP_VERSION,
+			'phpSapi' => PHP_SAPI,
+			'laravelVersion' => Application::VERSION,
+			'clockworkVersion' => Clockwork::VERSION,
+			'gitSha' => $this->detectGitSha(),
+			'storageDriver' => $this->getConfig('storage', 'files'),
+			'databaseDefault' => $this->app['config']->get('database.default'),
+			'cacheDefault' => $this->app['config']->get('cache.default'),
+			'queueDefault' => $this->app['config']->get('queue.default'),
+			'mailDefault' => $this->app['config']->get('mail.default'),
+			'clockwork' => [
+				'enabled' => $this->isEnabled(),
+				'collectDataAlways' => $this->getConfig('collect_data_always', false),
+				'requests' => [
+					'collect' => ($this->isEnabled() || $this->getConfig('collect_data_always', false))
+						&& ! $this->app->runningInConsole(),
+					'errorsOnly' => $this->getConfig('requests.errors_only', false),
+					'slowOnly' => $this->getConfig('requests.slow_only', false)
+				],
+				'artisan' => [
+					'collect' => $this->getConfig('artisan.collect', false)
+				],
+				'queue' => [
+					'collect' => $this->getConfig('queue.collect', false)
+				],
+				'tests' => [
+					'collect' => $this->getConfig('tests.collect', false)
+				]
+			]
+		]);
 	}
 
 	// Update metadata
@@ -780,5 +859,82 @@ class ClockworkSupport
 		return [
 			'clockwork:clean'
 		];
+	}
+
+	protected function ensureMetadataAccess()
+	{
+		if (isset($this->app['session'])) $this->app['session.store']->reflash();
+
+		$authenticator = $this->app['clockwork']->authenticator();
+		$authenticated = $authenticator->check($this->app['request']->header('X-Clockwork-Auth'));
+
+		if ($authenticated === true) return null;
+
+		return new JsonResponse([ 'message' => $authenticated, 'requires' => $authenticator->requires() ], 403);
+	}
+
+	protected function requestHasFailures($request)
+	{
+		return count($request->toEventDetails()['errors'] ?? []) > 0;
+	}
+
+	protected function requestStatus($request)
+	{
+		if ($request->type == 'command') return $request->commandExitCode;
+		if ($request->type == 'queue-job') return $request->jobStatus;
+		if ($request->type == 'test') return $request->testStatus;
+
+		return $request->responseStatus;
+	}
+
+	protected function matchesFailureSearch($request, $search)
+	{
+		$details = $request->toEventDetails();
+		$haystacks = array_filter([
+			$request->uuid,
+			$request->id,
+			$details['summary']['name'] ?? null,
+			$details['summary']['title'] ?? null,
+			$details['summary']['rootMessage'] ?? null,
+			$request->controller,
+			$request->uri,
+			$request->commandName,
+			$request->jobName,
+			$request->jobDescription,
+			$request->testName
+		]);
+
+		foreach ($haystacks as $value) {
+			if (stripos((string) $value, $search) !== false) return true;
+		}
+
+		return false;
+	}
+
+	protected function csvInput($value)
+	{
+		if (is_array($value)) return array_values(array_filter($value, function ($item) { return $item !== ''; }));
+
+		return array_values(array_filter(array_map('trim', explode(',', (string) $value)), function ($item) {
+			return $item !== '';
+		}));
+	}
+
+	protected function detectGitSha()
+	{
+		$headPath = base_path('.git/HEAD');
+
+		if (! is_readable($headPath)) return null;
+
+		$head = trim((string) @file_get_contents($headPath));
+
+		if (strpos($head, 'ref: ') !== 0) return $head ?: null;
+
+		$ref = trim(substr($head, 5));
+		$refPath = base_path('.git/' . $ref);
+
+		if (! is_readable($refPath)) return null;
+
+		return trim((string) @file_get_contents($refPath)) ?: null;
 	}
 }

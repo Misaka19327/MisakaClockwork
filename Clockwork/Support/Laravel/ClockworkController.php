@@ -50,6 +50,22 @@ class ClockworkController extends Controller
 		return $clockworkSupport->getEventDetailsByUuid($uuid);
 	}
 
+	// Failures list endpoint
+	public function getFailures(ClockworkSupport $clockworkSupport, Request $request)
+	{
+		$this->ensureClockworkIsEnabled($clockworkSupport);
+
+		return $clockworkSupport->getFailures($request->all());
+	}
+
+	// Environment snapshot endpoint
+	public function getEnv(ClockworkSupport $clockworkSupport)
+	{
+		$this->ensureClockworkIsEnabled($clockworkSupport);
+
+		return $clockworkSupport->getEnvironmentSnapshot();
+	}
+
 	// Metadata updating endpoint
 	public function updateData(ClockworkSupport $clockworkSupport, Request $request, $id = null)
 	{

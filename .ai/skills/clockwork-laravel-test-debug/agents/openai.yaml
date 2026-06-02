@@ -1,0 +1,7 @@
+interface:
+  display_name: "Clockwork Laravel Debug"
+  short_description: "Triage Laravel test failures via Clockwork APIs."
+  default_prompt: "Use $clockwork-laravel-test-debug to inspect Laravel test failures through the Clockwork debugging endpoints."
+
+policy:
+  allow_implicit_invocation: true

@@ -569,6 +569,9 @@ class Request
 	public function toEventDetails()
 	{
 		return [
+			'summary'        => $this->toFailureSummary(),
+			'primaryError'   => $this->getPrimaryError(),
+			'topAppFrames'   => $this->getTopAppFrames(),
 			'uuid'           => $this->uuid,
 			'id'             => $this->id,
 			'type'           => $this->type,
@@ -628,6 +631,31 @@ class Request
 		];
 	}
 
+	public function toFailureSummary()
+	{
+		$primaryError = $this->getPrimaryError();
+		$name = $this->type == 'command'
+			? $this->commandName
+			: ($this->type == 'queue-job'
+				? ($this->jobName ?: $this->jobDescription)
+				: ($this->type == 'test' ? $this->testName : ($this->uri ?: $this->url)));
+		$status = $this->type == 'command'
+			? $this->commandExitCode
+			: ($this->type == 'queue-job'
+				? $this->jobStatus
+				: ($this->type == 'test' ? $this->testStatus : $this->responseStatus));
+
+		return [
+			'severity'    => count($this->getErrorInformation()) ? 'error' : 'info',
+			'failureType' => $primaryError['type'] ?? null,
+			'name'        => $name,
+			'status'      => $status,
+			'title'       => $this->formatErrorTitle($primaryError),
+			'rootMessage' => $this->formatErrorMessage($primaryError),
+			'topAppFrame' => $this->getTopAppFrames()[0] ?? null
+		];
+	}
+
 	protected function getErrorInformation()
 	{
 		$errors = [];
@@ -665,6 +693,125 @@ class Request
 		}
 
 		return $errors;
+	}
+
+	public function getPrimaryError()
+	{
+		$errors = $this->getErrorInformation();
+
+		if (! count($errors)) return null;
+
+		foreach ([ 'log', 'test', 'queue-job', 'command', 'http', 'response' ] as $type) {
+			foreach ($errors as $error) {
+				if (($error['type'] ?? null) === $type) return $error;
+			}
+		}
+
+		return $errors[0];
+	}
+
+	public function getTopAppFrames($limit = 5)
+	{
+		$frames = [];
+
+		foreach ($this->collectCandidateTraces() as $trace) {
+			foreach ((array) $trace as $frame) {
+				$file = is_array($frame) ? ($frame['file'] ?? null) : ($frame->file ?? null);
+				$line = is_array($frame) ? ($frame['line'] ?? null) : ($frame->line ?? null);
+				$call = is_array($frame) ? ($frame['call'] ?? null) : ($frame->call ?? null);
+				$isVendor = is_array($frame) ? ($frame['isVendor'] ?? null) : ($frame->isVendor ?? null);
+
+				if (! $file || $this->isVendorFrame($file, $isVendor)) continue;
+
+				$key = "{$file}:{$line}:{$call}";
+				if (isset($frames[$key])) continue;
+
+				$frames[$key] = array_filter([
+					'file' => $file,
+					'line' => $line,
+					'call' => $call
+				], function ($value) { return $value !== null; });
+
+				if (count($frames) >= $limit) break 2;
+			}
+		}
+
+		return array_values($frames);
+	}
+
+	protected function collectCandidateTraces()
+	{
+		$traces = [];
+
+		foreach ($this->log()->toArray() as $message) {
+			if (! empty($message['trace'])) $traces[] = $message['trace'];
+		}
+
+		foreach (array_merge(
+			$this->databaseQueriesWithContext(),
+			$this->cacheQueriesWithContext(),
+			$this->redisCommandsWithContext(),
+			$this->httpRequestsWithContext(),
+			$this->events,
+			$this->notifications
+		) as $item) {
+			$trace = is_array($item) ? ($item['trace'] ?? null) : ($item->trace ?? null);
+			if (! empty($trace)) $traces[] = $trace;
+		}
+
+		return $traces;
+	}
+
+	protected function isVendorFrame($file, $isVendor = null)
+	{
+		if ($isVendor !== null) return (bool) $isVendor;
+
+		return strpos(str_replace('\\', '/', $file), '/vendor/') !== false;
+	}
+
+	protected function formatErrorTitle($error)
+	{
+		if (! $error) return null;
+
+		if (($error['type'] ?? null) == 'log') {
+			return $error['message']['message'] ?? 'Application logged an error.';
+		} elseif (($error['type'] ?? null) == 'response') {
+			return "Request failed with status {$error['status']}.";
+		} elseif (($error['type'] ?? null) == 'command') {
+			return "Command exited with code {$error['exitCode']}.";
+		} elseif (($error['type'] ?? null) == 'queue-job') {
+			return "Queue job ended with status {$error['status']}.";
+		} elseif (($error['type'] ?? null) == 'test') {
+			return "Test ended with status {$error['status']}.";
+		} elseif (($error['type'] ?? null) == 'http') {
+			$request = $error['request'] ?? [];
+			$method = is_array($request) ? ($request['method'] ?? 'HTTP') : ($request->method ?? 'HTTP');
+			$url = is_array($request) ? ($request['url'] ?? null) : ($request->url ?? null);
+
+			return trim("HTTP request {$method} {$url}");
+		}
+
+		return $error['type'] ?? 'error';
+	}
+
+	protected function formatErrorMessage($error)
+	{
+		if (! $error) return null;
+
+		if (($error['type'] ?? null) == 'log') {
+			return $error['message']['message'] ?? null;
+		} elseif (($error['type'] ?? null) == 'test') {
+			return $error['message'] ?? null;
+		} elseif (($error['type'] ?? null) == 'command') {
+			return $error['output'] ?? null;
+		} elseif (($error['type'] ?? null) == 'http') {
+			$request = $error['request'] ?? [];
+			$status = is_array($request) ? ($request['response']['status'] ?? null) : ($request->response->status ?? null);
+
+			return $status ? "HTTP request failed with status {$status}." : 'HTTP request failed.';
+		}
+
+		return $this->formatErrorTitle($error);
 	}
 
 	protected function databaseQueriesWithContext()
