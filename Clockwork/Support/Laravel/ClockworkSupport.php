@@ -647,6 +647,12 @@ class ClockworkSupport
             $row['type'] = $this->inferQueryType($row['query'] ?? '');
         }
 
+        // Views store the view name nested under data.name; lift it so the UI can read row.name.
+        // Twig profiler entries (and any source without data.name) carry the name in description.
+        if ($category == 'views') {
+            $row['name'] = $row['data']['name'] ?? ($row['name'] ?? ($row['description'] ?? null));
+        }
+
         $row['requestId'] = $request->id;
         $row['requestUuid'] = $request->uuid;
         $row['requestUri'] = $this->requestLabel($request);

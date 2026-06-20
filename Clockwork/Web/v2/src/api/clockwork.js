@@ -141,6 +141,29 @@ export const api = {
     const older = await this.previous(latest.id, Math.max(0, count - 1))
     return [latest, ...(Array.isArray(older) ? older : [])]
   },
+
+  /**
+   * Overview KPIs.
+   * `GET /__clockwork/stats?since=&until=&type=&limit=` → aggregated totals across recent
+   * requests (requests, failedRequests, errorRate, avgDuration, byType, database, cache,
+   * redis, log). `failedRequests` uses the same definition as `/failures`. Used by: Overview.
+   */
+  stats(params = {}) {
+    const q = new URLSearchParams(params).toString()
+    return request('/stats' + (q ? `?${q}` : ''))
+  },
+
+  /**
+   * Operations center for one category.
+   * `GET /__clockwork/operations/{category}?since=&until=&type=&limit=&scanLimit=` →
+   * `{ category, window, kpis, total, returned, requestCount, operations[] }`. Each operation
+   * carries `requestId`/`requestUri`/`requestType`/`requestTime` for reverse-lookup; `total`
+   * is the matched count (pre-limit), `returned` the page length. Used by: Operations page.
+   */
+  operations(category, params = {}) {
+    const q = new URLSearchParams(params).toString()
+    return request(`/operations/${encodeURIComponent(category)}` + (q ? `?${q}` : ''))
+  },
 }
 
 // ── Field mappers: real Clockwork request object → shapes the UI expects ──
@@ -247,5 +270,38 @@ export function toDetail(r) {
       deletes: r.cacheDeletes ?? 0,
       time: r.cacheTime ?? 0,
     },
+  }
+}
+
+// Coerce an operations-category KPI object into the safe shape KpiBand renders: numbers
+// default to 0, sub-maps default to {}, and the log/views fields the UI expects (levels,
+// slowestCount) are derived from the API's byLevel / topViews so empty categories don't
+// render NaN.
+export function normalizeKpi(category, k) {
+  const num = (v) => (typeof v === 'number' ? v : (Number.isFinite(Number(v)) ? Number(v) : 0))
+  const obj = (o) => (o && typeof o === 'object' && !Array.isArray(o) ? o : {})
+
+  switch (category) {
+    case 'database':
+      return { select: num(k.select), insert: num(k.insert), update: num(k.update), delete: num(k.delete), other: num(k.other), slow: num(k.slow), avgDuration: num(k.avgDuration), totalDuration: num(k.totalDuration), requestCount: num(k.requestCount) }
+    case 'cache':
+      return { hits: num(k.hits), misses: num(k.misses), writes: num(k.writes), deletes: num(k.deletes), readTotal: num(k.readTotal), hitRate: num(k.hitRate), avgDuration: num(k.avgDuration), totalTime: num(k.totalTime), requestCount: num(k.requestCount) }
+    case 'redis':
+      return { total: num(k.total), commands: obj(k.commands), avgDuration: num(k.avgDuration), totalTime: num(k.totalTime), requestCount: num(k.requestCount) }
+    case 'log': {
+      const levels = obj(k.byLevel ?? k.levels)
+      return { total: num(k.total), error: num(k.error), warning: num(k.warning), notice: num(k.notice), info: num(k.info), debug: num(k.debug), levels, requestCount: num(k.requestCount) }
+    }
+    case 'events':
+      return { total: num(k.total), topEvents: obj(k.topEvents), avgDuration: num(k.avgDuration), requestCount: num(k.requestCount) }
+    case 'views': {
+      const topViews = obj(k.topViews)
+      const slowestName = k.slowestName || null
+      return { total: num(k.total), topViews, avgDuration: num(k.avgDuration), totalTime: num(k.totalTime), requestCount: num(k.requestCount), slowest: num(k.slowest), slowestName, slowestCount: num(slowestName ? topViews[slowestName] : 0) }
+    }
+    case 'notifications':
+      return { total: num(k.total), types: obj(k.types), avgDuration: num(k.avgDuration), totalTime: num(k.totalTime), requestCount: num(k.requestCount) }
+    default:
+      return k
   }
 }
