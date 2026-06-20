@@ -200,4 +200,11 @@ export const EN = {
   '统计截止': 'stats as of',
   '无匹配结果': 'No matching results',
   '系统级事件不占耗时': 'system-level event, no duration',
+
+  // ── async states ──
+  '加载中…': 'Loading…',
+  '加载失败': 'Failed to load',
+  '暂无请求': 'No requests',
+  '请求未找到': 'Request not found',
+  '重试': 'Retry',
 }

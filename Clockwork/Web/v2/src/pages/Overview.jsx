@@ -104,8 +104,8 @@ export default function Overview() {
                     key={i}
                     tabIndex={0}
                     role="link"
-                    onClick={() => navigate(`/requests/${i}`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/requests/${i}`) } }}
+                    onClick={() => navigate('/requests')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/requests') } }}
                   >
                     <td><MethodBadge method={r.method} /></td>
                     <td className="uri-col">{r.uri}</td>

@@ -289,6 +289,373 @@ class ClockworkSupport
         return false;
     }
 
+    // Aggregate overview KPIs across recent requests. Walks the most recent matching
+    // requests (capped) and sums per-request counters. GET /__clockwork/stats.
+    public function getStats(array $input = [])
+    {
+        if ($response = $this->ensureMetadataAccess()) return $response;
+
+        $since = isset($input['since']) ? (float)$input['since'] : null;
+        $until = isset($input['until']) ? (float)$input['until'] : null;
+        $types = $this->csvInput($input['type'] ?? []);
+        $scanLimit = max(1, min((int)($input['limit'] ?? 1000), 5000));
+
+        $search = $this->operationsSearch($since, $until, $types);
+
+        $storage = $this->app['clockwork']->storage();
+        $cursor = $storage->latest($search);
+        $scanned = 0; $truncated = false;
+
+        $requests = 0; $failed = 0; $durationSum = 0.0; $durationCount = 0;
+        $byType = ['request' => 0, 'command' => 0, 'queue-job' => 0, 'test' => 0];
+        $db = ['queries' => 0, 'slow' => 0, 'duration' => 0.0, 'selects' => 0, 'inserts' => 0, 'updates' => 0, 'deletes' => 0, 'others' => 0];
+        $cache = ['reads' => 0, 'hits' => 0, 'writes' => 0, 'deletes' => 0, 'time' => 0.0];
+        $redis = 0;
+        $log = ['total' => 0, 'errors' => 0, 'byLevel' => []];
+
+        while ($cursor) {
+            if ($scanned++ >= $scanLimit) { $truncated = true; break; }
+            $r = $cursor;
+
+            $requests++;
+            if (isset($byType[$r->type])) $byType[$r->type]++;
+            if ($this->requestHasFailures($r)) $failed++;
+
+            $dur = $this->requestDuration($r);
+            if ($dur !== null) { $durationSum += $dur; $durationCount++; }
+
+            $db['queries']  += $this->n($r->databaseQueriesCount);
+            $db['slow']     += $this->n($r->databaseSlowQueries);
+            $db['duration'] += $this->n($r->databaseDuration);
+            $db['selects']  += $this->n($r->databaseSelects);
+            $db['inserts']  += $this->n($r->databaseInserts);
+            $db['updates']  += $this->n($r->databaseUpdates);
+            $db['deletes']  += $this->n($r->databaseDeletes);
+            $db['others']   += $this->n($r->databaseOthers);
+
+            $cache['reads']   += $this->n($r->cacheReads);
+            $cache['hits']    += $this->n($r->cacheHits);
+            $cache['writes']  += $this->n($r->cacheWrites);
+            $cache['deletes'] += $this->n($r->cacheDeletes);
+            $cache['time']    += $this->n($r->cacheTime);
+
+            $redis += count($r->redisCommands ?: []);
+
+            foreach ($r->log ?: [] as $entry) {
+                $log['total']++;
+                $level = $entry['level'] ?? 'info';
+                $log['byLevel'][$level] = ($log['byLevel'][$level] ?? 0) + 1;
+                if (in_array($level, ['emergency', 'alert', 'critical', 'error'])) $log['errors']++;
+            }
+
+            $cursor = $this->previousOne($storage, $r->id, $search);
+        }
+
+        return new JsonResponse([
+            'window' => ['since' => $since, 'until' => $until, 'scannedRequests' => $scanned, 'truncated' => $truncated],
+            'requests' => $requests,
+            'failedRequests' => $failed,
+            'errorRate' => $requests ? round($failed / $requests * 100, 2) : 0,
+            'avgDuration' => $durationCount ? round($durationSum / $durationCount, 1) : 0,
+            'byType' => $byType,
+            'database' => $db,
+            'cache' => array_merge($cache, ['hitRate' => $cache['reads'] ? round($cache['hits'] / $cache['reads'] * 100, 1) : 0]),
+            'redis' => ['commands' => $redis],
+            'log' => $log,
+        ]);
+    }
+
+    // Per-category cross-request operations: KPIs + a flattened, back-referenced operation
+    // list. GET /__clockwork/operations/{category}. Client-side search/sort/paginate the
+    // returned list (matches the existing operations-center UI).
+    public function getOperations($category, array $input = [])
+    {
+        if ($response = $this->ensureMetadataAccess()) return $response;
+
+        $allowed = ['database', 'cache', 'redis', 'log', 'events', 'views', 'notifications'];
+        if (!in_array($category, $allowed)) {
+            return new JsonResponse(['message' => "Unknown operation category: {$category}", 'allowed' => $allowed], 400);
+        }
+
+        $since = isset($input['since']) ? (float)$input['since'] : null;
+        $until = isset($input['until']) ? (float)$input['until'] : null;
+        $types = $this->csvInput($input['type'] ?? []);
+        $scanLimit = max(1, min((int)($input['scanLimit'] ?? 1000), 5000));
+        $opLimit = max(1, min((int)($input['limit'] ?? 2000), 10000));
+
+        $search = $this->operationsSearch($since, $until, $types);
+        $storage = $this->app['clockwork']->storage();
+
+        $cursor = $storage->latest($search);
+        $scanned = 0; $truncated = false; $requestCount = 0; $opCount = 0;
+        $operations = [];
+        $durationSum = 0.0; $durationCount = 0;
+        $tally = [
+            'commands' => [], 'levels' => [], 'events' => [], 'views' => [], 'types' => [],
+            'db' => ['queries' => 0, 'slow' => 0, 'duration' => 0.0, 'select' => 0, 'insert' => 0, 'update' => 0, 'delete' => 0, 'other' => 0],
+            'cache' => ['reads' => 0, 'hits' => 0, 'writes' => 0, 'deletes' => 0, 'time' => 0.0],
+            'slowestView' => ['name' => null, 'duration' => 0],
+        ];
+
+        while ($cursor) {
+            if ($scanned++ >= $scanLimit) { $truncated = true; break; }
+            $r = $cursor;
+            $arr = $this->operationsArray($r, $category);
+            if (!count($arr)) { $cursor = $this->previousOne($storage, $r->id, $search); continue; }
+            $requestCount++;
+
+            // Per-request counters feed the database / cache KPIs.
+            if ($category == 'database') {
+                $tally['db']['queries']  += $this->n($r->databaseQueriesCount);
+                $tally['db']['slow']     += $this->n($r->databaseSlowQueries);
+                $tally['db']['duration'] += $this->n($r->databaseDuration);
+                $tally['db']['select']   += $this->n($r->databaseSelects);
+                $tally['db']['insert']   += $this->n($r->databaseInserts);
+                $tally['db']['update']   += $this->n($r->databaseUpdates);
+                $tally['db']['delete']   += $this->n($r->databaseDeletes);
+                $tally['db']['other']    += $this->n($r->databaseOthers);
+            } elseif ($category == 'cache') {
+                $tally['cache']['reads']   += $this->n($r->cacheReads);
+                $tally['cache']['hits']    += $this->n($r->cacheHits);
+                $tally['cache']['writes']  += $this->n($r->cacheWrites);
+                $tally['cache']['deletes'] += $this->n($r->cacheDeletes);
+                $tally['cache']['time']    += $this->n($r->cacheTime);
+            }
+
+            foreach ($arr as $op) {
+                $opCount++;
+                $row = $this->operationRow($op, $r, $category);
+
+                $dur = $this->saneDuration($row['duration'] ?? null);
+                if ($dur !== null) { $durationSum += $dur; $durationCount++; }
+
+                switch ($category) {
+                    case 'redis':
+                        $c = $row['command'] ?? '?';
+                        $tally['commands'][$c] = ($tally['commands'][$c] ?? 0) + 1;
+                        break;
+                    case 'log':
+                        $lvl = $row['level'] ?? 'info';
+                        $tally['levels'][$lvl] = ($tally['levels'][$lvl] ?? 0) + 1;
+                        break;
+                    case 'events':
+                        $e = $row['event'] ?? '?';
+                        $tally['events'][$e] = ($tally['events'][$e] ?? 0) + 1;
+                        break;
+                    case 'views':
+                        $name = $row['data']['name'] ?? ($row['name'] ?? '?');
+                        $tally['views'][$name] = ($tally['views'][$name] ?? 0) + 1;
+                        if ($dur !== null && $dur > $tally['slowestView']['duration']) {
+                            $tally['slowestView'] = ['name' => $name, 'duration' => $dur];
+                        }
+                        break;
+                    case 'notifications':
+                        $t = $row['type'] ?? 'unknown';
+                        $tally['types'][$t] = ($tally['types'][$t] ?? 0) + 1;
+                        break;
+                }
+
+                if (count($operations) < $opLimit) $operations[] = $row;
+                else $truncated = true;
+            }
+
+            $cursor = $this->previousOne($storage, $r->id, $search);
+        }
+
+        $kpis = $this->buildOperationsKpis($category, $tally, $durationSum, $durationCount, $opCount, $requestCount);
+
+        return new JsonResponse([
+            'category' => $category,
+            'window' => ['since' => $since, 'until' => $until, 'scannedRequests' => $scanned, 'truncated' => $truncated],
+            'kpis' => $kpis,
+            'total' => $opCount,
+            'returned' => count($operations),
+            'requestCount' => $requestCount,
+            'operations' => $operations,
+        ]);
+    }
+
+    // Assemble the per-category KPI object from the walk tallies.
+    protected function buildOperationsKpis($category, $tally, $durationSum, $durationCount, $opCount, $requestCount)
+    {
+        $avg = $durationCount ? round($durationSum / $durationCount, 2) : 0;
+
+        switch ($category) {
+            case 'database':
+                $d = $tally['db'];
+                return [
+                    'select' => $d['select'], 'insert' => $d['insert'], 'update' => $d['update'],
+                    'delete' => $d['delete'], 'other' => $d['other'], 'slow' => $d['slow'],
+                    'avgDuration' => $d['queries'] ? round($d['duration'] / $d['queries'], 1) : 0,
+                    'totalDuration' => (int) round($d['duration']), 'requestCount' => $requestCount,
+                ];
+            case 'cache':
+                $c = $tally['cache'];
+                return [
+                    'hits' => $c['hits'], 'misses' => max(0, $c['reads'] - $c['hits']),
+                    'writes' => $c['writes'], 'deletes' => $c['deletes'], 'readTotal' => $c['reads'],
+                    'hitRate' => $c['reads'] ? round($c['hits'] / $c['reads'] * 100, 1) : 0,
+                    'avgDuration' => $avg, 'totalTime' => (int) round($c['time']), 'requestCount' => $requestCount,
+                ];
+            case 'redis':
+                arsort($tally['commands']);
+                return [
+                    'total' => $opCount, 'commands' => (object) $tally['commands'],
+                    'avgDuration' => $avg, 'totalTime' => (int) round($durationSum), 'requestCount' => $requestCount,
+                ];
+            case 'log':
+                $levels = $tally['levels'];
+                return [
+                    'total' => $opCount, 'byLevel' => (object) $levels,
+                    'error' => ($levels['error'] ?? 0) + ($levels['critical'] ?? 0) + ($levels['alert'] ?? 0) + ($levels['emergency'] ?? 0),
+                    'warning' => $levels['warning'] ?? 0, 'notice' => $levels['notice'] ?? 0,
+                    'info' => $levels['info'] ?? 0, 'debug' => $levels['debug'] ?? 0,
+                    'requestCount' => $requestCount,
+                ];
+            case 'events':
+                arsort($tally['events']);
+                return [
+                    'total' => $opCount, 'topEvents' => (object) array_slice($tally['events'], 0, 10, true),
+                    'avgDuration' => $avg, 'requestCount' => $requestCount,
+                ];
+            case 'views':
+                arsort($tally['views']);
+                return [
+                    'total' => $opCount, 'topViews' => (object) array_slice($tally['views'], 0, 10, true),
+                    'avgDuration' => $avg, 'totalTime' => (int) round($durationSum), 'requestCount' => $requestCount,
+                    'slowest' => (int) round($tally['slowestView']['duration']), 'slowestName' => $tally['slowestView']['name'],
+                ];
+            case 'notifications':
+                arsort($tally['types']);
+                return [
+                    'total' => $opCount, 'types' => (object) $tally['types'],
+                    'avgDuration' => $avg, 'totalTime' => (int) round($durationSum), 'requestCount' => $requestCount,
+                ];
+        }
+
+        return [];
+    }
+
+    // Search filter (received-time window + request type) shared by both aggregation walks.
+    protected function operationsSearch($since, $until, $types)
+    {
+        $received = [];
+        if ($since !== null) $received[] = '>' . $since;
+        if ($until !== null) $received[] = '<' . $until;
+
+        return new Search(array_filter([
+            'received' => $received,
+            'type' => $types,
+        ]));
+    }
+
+    // Walk one step backward through matching requests (respects the Search filter).
+    protected function previousOne($storage, $id, $search)
+    {
+        $prev = $storage->previous($id, 1, $search);
+
+        return count($prev) ? $prev[0] : null;
+    }
+
+    // Coerce a possibly-null counter into a number.
+    protected function n($v)
+    {
+        return is_numeric($v) ? $v * 1 : 0;
+    }
+    // A duration (ms) is only trustworthy in the 0..10min range; older/corrupt records can
+    // carry values like -1.78e12 (responseTime was null when stored), which would poison
+    // aggregates. Reject anything outside the sane range.
+    protected function saneDuration($v)
+    {
+        return ($v !== null && is_numeric($v) && $v >= 0 && $v < 600000) ? $v * 1 : null;
+    }
+
+    // Sane response duration for a request, preferring the persisted responseDuration.
+    protected function requestDuration($request)
+    {
+        $dur = $request->responseDuration ?? ($request->responseTime ? $request->getResponseDuration() : null);
+
+        return $this->saneDuration($dur);
+    }
+
+    // Human label for a request — used as an operation's back-reference target.
+    protected function requestLabel($request)
+    {
+        if ($request->type == 'command') return $request->commandName ? 'artisan ' . $request->commandName : 'artisan';
+        if ($request->type == 'queue-job') return $request->jobName ?: 'queue-job';
+        if ($request->type == 'test') return $request->testName ?: 'test';
+
+        return $request->uri ?: (string) ($request->url ?? '');
+    }
+
+    // The operation array on a request for a given category.
+    protected function operationsArray($request, $category)
+    {
+        // Notifications also include the legacy emailsData (older Swift-based emails that
+        // predate the notifications data source), normalized to the notifications shape so
+        // old records don't silently drop their mail.
+        if ($category == 'notifications') {
+            $emails = [];
+            foreach ((array) ($request->emailsData ?: []) as $email) {
+                $data = (is_array($email) && isset($email['data']) && is_array($email['data'])) ? $email['data'] : [];
+                $emails[] = [
+                    'subject'     => $data['subject'] ?? null,
+                    'to'          => $data['to'] ?? null,
+                    'from'        => $data['from'] ?? null,
+                    'type'        => 'mail',
+                    'duration'    => $email['duration'] ?? null,
+                    'time'        => $email['start'] ?? null,
+                    'description' => $email['description'] ?? 'Sending an email message',
+                    '_source'     => 'emailsData',
+                ];
+            }
+
+            return array_merge(is_array($request->notifications) ? $request->notifications : [], $emails);
+        }
+
+        $map = [
+            'database' => 'databaseQueries', 'cache' => 'cacheQueries', 'redis' => 'redisCommands',
+            'log' => 'log', 'events' => 'events', 'views' => 'viewsData',
+        ];
+
+        $prop = $map[$category] ?? null;
+        if (!$prop) return [];
+
+        $arr = $request->$prop;
+
+        return is_array($arr) ? $arr : [];
+    }
+
+    // Infer a SQL type from the statement verb (real query records carry no explicit type).
+    protected function inferQueryType($sql)
+    {
+        $sql = ltrim((string) $sql);
+        if (preg_match('/^select\b/i', $sql)) return 'select';
+        if (preg_match('/^insert\b/i', $sql)) return 'insert';
+        if (preg_match('/^update\b/i', $sql)) return 'update';
+        if (preg_match('/^(delete|truncate)\b/i', $sql)) return 'delete';
+
+        return 'other';
+    }
+
+    // Cast an operation to a JSON row and attach the originating-request back-reference.
+    protected function operationRow($op, $request, $category)
+    {
+        $row = is_array($op) ? $op : (array) $op;
+
+        if ($category == 'database' && !isset($row['type'])) {
+            $row['type'] = $this->inferQueryType($row['query'] ?? '');
+        }
+
+        $row['requestId'] = $request->id;
+        $row['requestUuid'] = $request->uuid;
+        $row['requestUri'] = $this->requestLabel($request);
+        $row['requestType'] = $request->type;
+        $row['requestTime'] = $request->time;
+
+        return $row;
+    }
+
     // Make an authenticator instance based on the current configuration
 
     public function getEnvironmentSnapshot()

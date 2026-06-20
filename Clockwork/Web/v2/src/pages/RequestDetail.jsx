@@ -5,7 +5,7 @@ import { gsap, motionOk } from '../lib/motion.js'
 import { statusClass } from '../lib/format.js'
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
-import { DETAIL } from '../data/requests.js'
+import { api, toDetail } from '../api/clockwork.js'
 import './request-detail.css'
 
 const TABS = [
@@ -20,11 +20,22 @@ const TABS = [
   { key: 'views', label: '视图', icon: 'views' },
 ]
 
+// Safely render KV values that may be objects/arrays (real Clockwork payloads carry
+// nested objects in sessionData/headers etc.).
+function fmtVal(v) {
+  if (v == null) return '—'
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v) } catch (_) { return String(v) }
+  }
+  return String(v)
+}
+
 function Kv({ k, v, title }) {
+  const s = fmtVal(v)
   return (
     <div className="kv-row">
       <div className="kv-key">{k}</div>
-      <div className="kv-val" title={title != null ? title : (typeof v === 'string' ? v : '')}>{v}</div>
+      <div className="kv-val" title={title != null ? title : s}>{s}</div>
     </div>
   )
 }
@@ -43,11 +54,25 @@ export default function RequestDetail() {
   const { t } = useApp()
   const navigate = useNavigate()
   const { id } = useParams()
-  const d = DETAIL // single mocked record (id kept for parity)
+  const [d, setD] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [tab, setTab] = useState('overview')
   const panelRef = useRef(null)
 
-  const counts = {
+  // Fetch the full (extended) request by id; cancel on id change.
+  // GET /__clockwork/{id}/extended → single request object with all data sources attached.
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true); setError(null); setD(null); setTab('overview')
+    api.extended(id)
+      .then(raw => { if (!cancelled) setD(toDetail(raw)) })
+      .catch(e => { if (!cancelled) setError(e) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id])
+
+  const counts = d && {
     database: d.dbStats.count,
     cache: d.cacheQueries.length,
     redis: d.redisCommands.length,
@@ -58,15 +83,14 @@ export default function RequestDetail() {
   }
 
   useEffect(() => {
-    if (!motionOk()) return
+    if (!motionOk() || !d) return
     const ctx = gsap.context(() => {
       gsap.from('.header-card', { opacity: 0, y: -12, duration: 0.35, ease: 'power2.out' })
-      gsap.from('.sidebar', { opacity: 0, x: -20, duration: 0.3, ease: 'power2.out', delay: 0.05 })
       gsap.from('.tab-bar button', { opacity: 0, y: -8, duration: 0.25, stagger: 0.035, ease: 'power2.out', delay: 0.12 })
       if (d.failed) gsap.from('.failure-banner.show', { opacity: 0, y: -12, duration: 0.3, ease: 'power2.out', delay: 0.35 })
     })
     return () => ctx.revert()
-  }, [])
+  }, [d])
 
   // Animate panel entrance on tab change.
   useEffect(() => {
@@ -81,7 +105,8 @@ export default function RequestDetail() {
   }, [tab])
 
   const bars = useMemo(() => {
-    const total = d.totalDuration
+    if (!d) return []
+    const total = d.totalDuration || 1
     const all = [
       ...d.timelineData.map(e => ({ label: e.description, start: e.start, end: e.end, color: e.color || 'grey' })),
       ...d.databaseQueries.map((q, i) => {
@@ -93,15 +118,26 @@ export default function RequestDetail() {
       ...d.cacheQueries.map((c, i) => ({ label: 'Cache #' + (i + 1), start: 5 + i * 2, end: 5 + i * 2 + (c.duration || 0.5), color: 'grey' })),
     ]
     return all.sort((a, b) => a.start - b.start)
-  }, [])
+  }, [d])
 
-  const pct = (v) => Math.max(0, Math.min(100, (v / d.totalDuration) * 100))
+  const pct = (v) => d && d.totalDuration ? Math.max(0, Math.min(100, (v / d.totalDuration) * 100)) : 0
 
   return (
     <div className="request-detail-page">
       <Sidebar variant="detail" />
 
       <main className="main">
+        {loading && (
+          <div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div>
+        )}
+        {!loading && error && (
+          <div className="op-empty">
+            <div className="empty-text">{error.status === 404 ? t('请求未找到') : (error.message || String(error))}</div>
+            <button className="btn-refresh" style={{ marginTop: 12 }} onClick={() => navigate('/requests')}>{t('返回列表')}</button>
+          </div>
+        )}
+        {d && (
+        <>
         <div className="header-card">
           <button className="back-btn" title={t('返回列表')} onClick={() => navigate('/requests')}>←</button>
           <div className="header-meta">
@@ -146,6 +182,8 @@ export default function RequestDetail() {
             {tab === 'views' && <ViewsPanel d={d} t={t} />}
           </div>
         </div>
+        </>
+        )}
       </main>
     </div>
   )

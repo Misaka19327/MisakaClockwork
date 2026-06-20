@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
 import { gsap, motionOk } from '../lib/motion.js'
@@ -6,39 +6,56 @@ import { durBar, durStr, memStr } from '../lib/format.js'
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { MethodBadge, StatusBadge, TypeBadge } from '../components/Badges.jsx'
-import { REQUESTS } from '../data/requests.js'
+import { api, toListRow } from '../api/clockwork.js'
 import './request-list.css'
 
 const TYPE_FILTERS = [
-  { key: 'all',       icon: null,     label: '全部' },
-  { key: 'request',   icon: 'globe',  label: '请求' },
+  { key: 'all',       icon: null,       label: '全部' },
+  { key: 'request',   icon: 'globe',    label: '请求' },
   { key: 'command',   icon: 'terminal', label: '命令' },
-  { key: 'queue-job', icon: 'queue',  label: '队列' },
-  { key: 'test',      icon: 'grid',   label: '测试' },
+  { key: 'queue-job', icon: 'queue',    label: '队列' },
+  { key: 'test',      icon: 'grid',     label: '测试' },
 ]
-
-// Attach original index so detail navigation is stable regardless of filtering.
-const ROWS = REQUESTS.map((r, i) => ({ ...r, _idx: i }))
 
 export default function RequestList() {
   const { t } = useApp()
   const navigate = useNavigate()
   const [activeType, setActiveType] = useState('all')
   const [search, setSearch] = useState('')
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const tbodyRef = useRef(null)
   const topbarRef = useRef(null)
   const sidebarRef = useRef(null)
 
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      // GET /__clockwork/latest  +  /__clockwork/{latest.id}/previous/99  → most-recent 100 requests
+      const data = await api.recent(100)
+      setRows(data.map(toListRow))
+    } catch (e) {
+      setError(e.message || String(e))
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
   const filtered = useMemo(() => {
-    let rows = ROWS
-    if (activeType !== 'all') rows = rows.filter(r => r.type === activeType)
+    let r = rows
+    if (activeType !== 'all') r = r.filter(x => x.type === activeType)
     if (search.trim()) {
       const q = search.toLowerCase()
-      rows = rows.filter(r => r.uri.toLowerCase().includes(q) || (r.controller || '').toLowerCase().includes(q))
+      r = r.filter(x => x.uri.toLowerCase().includes(q) || (x.controller || '').toLowerCase().includes(q))
     }
-    return rows
-  }, [activeType, search])
+    return r
+  }, [rows, activeType, search])
 
   // Stagger rows whenever the filtered set changes.
   useEffect(() => {
@@ -62,7 +79,7 @@ export default function RequestList() {
   function onRefresh(e) {
     if (motionOk()) gsap.to(e.currentTarget, { scale: 0.96, duration: 0.06, yoyo: true, repeat: 1, ease: 'power2.inOut' })
     setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 400)
+    load().finally(() => setRefreshing(false))
   }
 
   return (
@@ -113,14 +130,23 @@ export default function RequestList() {
               </tr>
             </thead>
             <tbody ref={tbodyRef}>
-              {filtered.map(r => {
+              {loading && (
+                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>
+              )}
+              {!loading && error && (
+                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载失败')}：{error}</div><div className="empty-sub">/__clockwork/latest</div></div></td></tr>
+              )}
+              {!loading && !error && filtered.length === 0 && (
+                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('暂无请求')}</div></div></td></tr>
+              )}
+              {!loading && !error && filtered.map(r => {
                 const { cls, widthPx } = durBar(r.dur)
                 const slow = r.dur > 500
                 return (
                   <tr
-                    key={r._idx}
+                    key={r.id}
                     className={r.failed ? 'row-failed' : ''}
-                    onClick={() => navigate(`/requests/${r._idx}`)}
+                    onClick={() => navigate(`/requests/${r.id}`)}
                   >
                     <td>{r.failed && <span className="fail-dot" />}<StatusBadge status={r.status} /></td>
                     <td><TypeBadge type={r.type} size={11} /></td>

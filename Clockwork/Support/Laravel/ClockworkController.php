@@ -69,6 +69,24 @@ class ClockworkController extends Controller
         return $clockworkSupport->getFailures($request->all());
     }
 
+    // Overview KPIs (cross-request aggregation)
+
+    public function getStats(ClockworkSupport $clockworkSupport, Request $request)
+    {
+        $this->ensureClockworkIsEnabled($clockworkSupport);
+
+        return $clockworkSupport->getStats($request->all());
+    }
+
+    // Operations center (per-category cross-request aggregation)
+
+    public function getOperations(ClockworkSupport $clockworkSupport, Request $request, $category)
+    {
+        $this->ensureClockworkIsEnabled($clockworkSupport);
+
+        return $clockworkSupport->getOperations($category, $request->all());
+    }
+
     // Metadata updating endpoint
 
     public function getEnv(ClockworkSupport $clockworkSupport)

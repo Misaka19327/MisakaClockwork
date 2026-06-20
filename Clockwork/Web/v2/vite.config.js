@@ -16,7 +16,14 @@ export default defineConfig({
     port: 5173,
     open: true,
     host: true,
-    allowedHosts: ['host.docker.internal', 'localhost', '127.0.0.1']
+    allowedHosts: ['host.docker.internal', 'localhost', '127.0.0.1'],
+    // In dev, proxy the Clockwork API to the Laravel test app (prod is same-origin).
+    proxy: {
+      '/__clockwork': {
+        target: process.env.VITE_CLOCKWORK_API_TARGET || 'http://127.0.0.1:8090',
+        changeOrigin: true
+      }
+    }
   },
   preview: {
     port: 4173,

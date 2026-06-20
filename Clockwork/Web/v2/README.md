@@ -15,6 +15,23 @@ v2 source that lived here.
   at a sub-path, so hash-based routing needs no server support (deep links like
   `/v2/#/operations?category=cache` work directly).
 
+## API integration
+
+The app talks to the real Clockwork backend (`/__clockwork/*`). See **[API.md](./API.md)**
+for the full endpoint reference, auth mechanism, and request/response shapes.
+
+| Page | Source | Endpoint |
+|------|--------|----------|
+| Login | live | `POST /__clockwork/auth` |
+| Request list | live | `GET /latest` + `/{id}/previous/{n}` |
+| Request detail (all tabs) | live | `GET /{id}/extended` |
+| Overview | mock (deferred — needs an aggregation endpoint) | — |
+| Operations center | mock (deferred — needs a new cross-request endpoint) | — |
+
+Auth: `POST /__clockwork/auth { password }` → `{ token }`; the token is sent back via the
+`X-Clockwork-Auth` header. When Clockwork auth is disabled (the test default) any password
+works and the header is ignored.
+
 ## Stack
 
 Vite + React 18 (JSX) + React Router v6 (HashRouter) + GSAP. All visuals, layout,
@@ -31,6 +48,27 @@ npm run build      # production build → ../public/v2  (what Clockwork serves)
 npm run preview    # preview the built app → http://localhost:4173
 ```
 
+### Running against the Laravel backend
+
+In dev the Vite server proxies `/__clockwork` to the Laravel app, so start Laravel first:
+
+```bash
+# from the test app (or any Clockwork-enabled Laravel app)
+cd ../../../../_clockwork_laravel_test     # adjust to your app
+php artisan serve --host=127.0.0.1 --port=8090
+
+# then, in this folder
+npm run dev
+# override the proxy target if Laravel runs elsewhere:
+#   VITE_CLOCKWORK_API_TARGET=http://127.0.0.1:8000 npm run dev
+```
+
+Then hit any app route a few times to generate data (e.g. `/test-clockwork`), open the v2
+app, and sign in (any password while auth is disabled).
+
+> In production no proxy is needed: the built app is served same-origin by Clockwork at
+> `/__clockwork/v2/app`, and `/__clockwork/*` resolves to the same host.
+>
 > `vite.config.js` enables `server.host` + `allowedHosts` so the dev/preview server is
 > reachable from other network interfaces (e.g. containerized browsers).
 

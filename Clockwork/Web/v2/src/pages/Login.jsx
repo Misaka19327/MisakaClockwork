@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
 import UtilToggles from '../components/UtilToggles.jsx'
 import Icon from '../components/Icon.jsx'
-import { isAuthenticated, login, VALID_KEY } from '../lib/auth.js'
+import { isAuthenticated, setAuth } from '../lib/auth.js'
+import { api } from '../api/clockwork.js'
 import './login.css'
 
 export default function Login() {
@@ -34,18 +35,22 @@ export default function Login() {
       return
     }
     setLoading(true)
-    // Simulate verification delay (prototype parity).
-    setTimeout(() => {
-      if (key === VALID_KEY) {
-        login(remember)
+    // Real auth: POST /__clockwork/auth with the password -> { token }.
+    api.authenticate(key)
+      .then(({ token }) => {
+        if (!token) {
+          const err = new Error(t('密钥不正确，请重试')); err.status = 403; throw err
+        }
+        setAuth(token, remember)
         navigate(from, { replace: true })
-      } else {
+      })
+      .catch((e) => {
         setLoading(false)
-        setError(t('密钥不正确，请重试'))
+        const msg = e && e.status === 403 ? t('密钥不正确，请重试') : (e && e.message) || t('密钥不正确，请重试')
+        setError(msg)
         inputRef.current?.focus()
         inputRef.current?.select()
-      }
-    }, 600)
+      })
   }
 
   return (

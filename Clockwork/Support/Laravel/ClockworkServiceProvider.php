@@ -80,6 +80,10 @@ class ClockworkServiceProvider extends ServiceProvider
             ->where('uuid', '[0-9a-fA-F-]{36}');
         $this->app['router']->get('/__clockwork/failures', 'Clockwork\Support\Laravel\ClockworkController@getFailures');
         $this->app['router']->get('/__clockwork/env', 'Clockwork\Support\Laravel\ClockworkController@getEnv');
+        // Aggregation endpoints (registered above the {id}/{direction?}/{count?} catch-all below).
+        $this->app['router']->get('/__clockwork/stats', 'Clockwork\Support\Laravel\ClockworkController@getStats');
+        $this->app['router']->get('/__clockwork/operations/{category}', 'Clockwork\Support\Laravel\ClockworkController@getOperations')
+            ->where('category', '(database|cache|redis|log|events|views|notifications)');
         $this->app['router']->get('/__clockwork/uuid/{uuid}/details', 'Clockwork\Support\Laravel\ClockworkController@getEventDetails')
             ->where('uuid', '[0-9a-fA-F-]{36}');
         $this->app['router']->get('/__clockwork/{id}/extended', 'Clockwork\Support\Laravel\ClockworkController@getExtendedData')
