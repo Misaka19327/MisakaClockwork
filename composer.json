@@ -1,7 +1,15 @@
 {
     "name": "itsgoingd/clockwork",
     "description": "php dev tools in your browser",
-    "keywords": ["debugging", "profiling", "logging", "laravel", "lumen", "slim", "devtools"],
+    "keywords": [
+        "debugging",
+        "profiling",
+        "logging",
+        "laravel",
+        "lumen",
+        "slim",
+        "devtools"
+    ],
     "homepage": "https://underground.works/clockwork",
     "license": "MIT",
     "authors": [
@@ -16,12 +24,12 @@
         "ext-json": "*"
     },
     "suggest": {
-		"ext-pdo": "Needed in order to use a SQL database for metadata storage",
-		"ext-pdo_sqlite": "Needed in order to use a SQLite for metadata storage",
-		"ext-pdo_mysql": "Needed in order to use MySQL for metadata storage",
-		"ext-pdo_postgres": "Needed in order to use Postgres for metadata storage",
-		"ext-redis": "Needed in order to use Redis for metadata storage",
-		"php-http/discovery": "Vanilla integration - required for the middleware zero-configuration setup"
+        "ext-pdo": "Needed in order to use a SQL database for metadata storage",
+        "ext-pdo_sqlite": "Needed in order to use a SQLite for metadata storage",
+        "ext-pdo_mysql": "Needed in order to use MySQL for metadata storage",
+        "ext-pdo_postgres": "Needed in order to use Postgres for metadata storage",
+        "ext-redis": "Needed in order to use Redis for metadata storage",
+        "php-http/discovery": "Vanilla integration - required for the middleware zero-configuration setup"
     },
     "autoload": {
         "psr-4": {

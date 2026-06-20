@@ -1,0 +1,143 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useApp } from '../context/AppContext.jsx'
+import { gsap, motionOk } from '../lib/motion.js'
+import { durBar, durStr, memStr } from '../lib/format.js'
+import Sidebar from '../components/Sidebar.jsx'
+import Icon from '../components/Icon.jsx'
+import { MethodBadge, StatusBadge, TypeBadge } from '../components/Badges.jsx'
+import { REQUESTS } from '../data/requests.js'
+import './request-list.css'
+
+const TYPE_FILTERS = [
+  { key: 'all',       icon: null,     label: '全部' },
+  { key: 'request',   icon: 'globe',  label: '请求' },
+  { key: 'command',   icon: 'terminal', label: '命令' },
+  { key: 'queue-job', icon: 'queue',  label: '队列' },
+  { key: 'test',      icon: 'grid',   label: '测试' },
+]
+
+// Attach original index so detail navigation is stable regardless of filtering.
+const ROWS = REQUESTS.map((r, i) => ({ ...r, _idx: i }))
+
+export default function RequestList() {
+  const { t } = useApp()
+  const navigate = useNavigate()
+  const [activeType, setActiveType] = useState('all')
+  const [search, setSearch] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const tbodyRef = useRef(null)
+  const topbarRef = useRef(null)
+  const sidebarRef = useRef(null)
+
+  const filtered = useMemo(() => {
+    let rows = ROWS
+    if (activeType !== 'all') rows = rows.filter(r => r.type === activeType)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      rows = rows.filter(r => r.uri.toLowerCase().includes(q) || (r.controller || '').toLowerCase().includes(q))
+    }
+    return rows
+  }, [activeType, search])
+
+  // Stagger rows whenever the filtered set changes.
+  useEffect(() => {
+    if (!motionOk() || !tbodyRef.current) return
+    const ctx = gsap.context(() => {
+      gsap.from('tr', { opacity: 0, y: 8, duration: 0.22, stagger: 0.014, ease: 'power2.out', clearProps: 'all' })
+    }, tbodyRef)
+    return () => ctx.revert()
+  }, [filtered])
+
+  // Entrance.
+  useEffect(() => {
+    if (!motionOk()) return
+    const ctx = gsap.context(() => {
+      gsap.from(sidebarRef.current, { opacity: 0, x: -24, duration: 0.3, ease: 'power2.out' })
+      gsap.from(topbarRef.current, { opacity: 0, y: -8, duration: 0.25, ease: 'power2.out', delay: 0.08 })
+    })
+    return () => ctx.revert()
+  }, [])
+
+  function onRefresh(e) {
+    if (motionOk()) gsap.to(e.currentTarget, { scale: 0.96, duration: 0.06, yoyo: true, repeat: 1, ease: 'power2.inOut' })
+    setRefreshing(true)
+    setTimeout(() => setRefreshing(false), 400)
+  }
+
+  return (
+    <div className="request-list-page">
+      <div ref={sidebarRef}><Sidebar variant="list" /></div>
+
+      <main className="main">
+        <div className="topbar" ref={topbarRef}>
+          <h1>{t('请求列表')}</h1>
+          <div className="filter-group">
+            {TYPE_FILTERS.map(f => (
+              <button
+                key={f.key}
+                className={`filter-pill ${activeType === f.key ? 'active' : ''}`}
+                onClick={() => setActiveType(f.key)}
+              >
+                {f.icon && <Icon name={f.icon} size={12} />}
+                <span>{t(f.label)}</span>
+              </button>
+            ))}
+          </div>
+          <div className="spacer" />
+          <button className="btn-refresh" onClick={onRefresh}>
+            <Icon name="refresh" size={12} style={refreshing ? { animation: 'spin 0.6s linear infinite' } : undefined} />
+            <span>{refreshing ? t('刷新中…') : t('刷新')}</span>
+          </button>
+          <input
+            className="topbar-search"
+            type="text"
+            placeholder={t('搜索 URI / 控制器…')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setSearch('') }}
+          />
+        </div>
+
+        <div className="table-wrap">
+          <table className="list-table">
+            <thead>
+              <tr>
+                <th style={{ width: 68 }}>{t('状态')}</th>
+                <th style={{ width: 90 }}>{t('类型')}</th>
+                <th style={{ width: 68 }}>{t('方法')}</th>
+                <th style={{ width: 'auto' }}>URI</th>
+                <th style={{ width: 96 }}>{t('耗时')}</th>
+                <th style={{ width: 96 }}>{t('内存')}</th>
+                <th style={{ width: 100 }}>{t('时间')}</th>
+              </tr>
+            </thead>
+            <tbody ref={tbodyRef}>
+              {filtered.map(r => {
+                const { cls, widthPx } = durBar(r.dur)
+                const slow = r.dur > 500
+                return (
+                  <tr
+                    key={r._idx}
+                    className={r.failed ? 'row-failed' : ''}
+                    onClick={() => navigate(`/requests/${r._idx}`)}
+                  >
+                    <td>{r.failed && <span className="fail-dot" />}<StatusBadge status={r.status} /></td>
+                    <td><TypeBadge type={r.type} size={11} /></td>
+                    <td className="cell-method">{r.method}</td>
+                    <td className="cell-uri" title={r.uri}>{r.uri}</td>
+                    <td className={`cell-dur${slow ? ' slow' : ''}`}>
+                      <span className={`dur-bar ${cls}`} style={{ width: widthPx }}>&nbsp;</span>{durStr(r.dur)}
+                    </td>
+                    <td className="cell-memory">{memStr(r.mem)}</td>
+                    <td className="cell-time">{r.time}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  )
+}

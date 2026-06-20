@@ -1,145 +1,157 @@
 <?php namespace Clockwork\DataSource;
 
-use Clockwork\DataSource\DataSource;
 use Clockwork\Helpers\Serializer;
 use Clockwork\Request\Request;
 
 // Data source providing data obtainable in vanilla PHP
 class PhpDataSource extends DataSource
 {
-	// Adds request, response information, session data and peak memory usage to the request
-	public function resolve(Request $request)
-	{
-		$request->time           = PHP_SAPI !== 'cli' ? $this->getRequestTime() : $request->time;
-		$request->method         = $this->getRequestMethod();
-		$request->url            = $this->getRequestUrl();
-		$request->uri            = $this->getRequestUri();
-		$request->headers        = $this->getRequestHeaders();
-		$request->getData        = $this->getGetData();
-		$request->postData       = $this->getPostData();
-		$request->requestData    = $this->getRequestData();
-		$request->sessionData    = $this->getSessionData();
-		$request->cookies        = $this->getCookies();
-		$request->responseStatus = $this->getResponseStatus();
-		$request->responseTime   = $this->getResponseTime();
-		$request->memoryUsage    = $this->getMemoryUsage();
+    // Adds request, response information, session data and peak memory usage to the request
+    public function resolve(Request $request)
+    {
+        $request->time = PHP_SAPI !== 'cli' ? $this->getRequestTime() : $request->time;
+        $request->method = $this->getRequestMethod();
+        $request->url = $this->getRequestUrl();
+        $request->uri = $this->getRequestUri();
+        $request->headers = $this->getRequestHeaders();
+        $request->getData = $this->getGetData();
+        $request->postData = $this->getPostData();
+        $request->requestData = $this->getRequestData();
+        $request->sessionData = $this->getSessionData();
+        $request->cookies = $this->getCookies();
+        $request->responseStatus = $this->getResponseStatus();
+        $request->responseTime = $this->getResponseTime();
+        $request->memoryUsage = $this->getMemoryUsage();
 
-		return $request;
-	}
+        return $request;
+    }
 
-	// Get the request cookies (normalized with passwords removed)
-	protected function getCookies()
-	{
-		return $this->removePasswords((new Serializer)->normalizeEach($_COOKIE));
-	}
+    // Get the request cookies (normalized with passwords removed)
 
-	// Get the request GET data (normalized with passwords removed)
-	protected function getGetData()
-	{
-		return $this->removePasswords((new Serializer)->normalizeEach($_GET));
-	}
+    protected function getRequestTime()
+    {
+        return $_SERVER['REQUEST_TIME_FLOAT'] ?? null;
+    }
 
-	// Get the request POST data (normalized with passwords removed)
-	protected function getPostData()
-	{
-		return $this->removePasswords((new Serializer)->normalizeEach($_POST));
-	}
+    // Get the request GET data (normalized with passwords removed)
 
-	// Get the request body data (attempt to parse as json, normalized with passwords removed)
-	protected function getRequestData()
-	{
-		// The data will already be parsed into POST data by PHP in case of application/x-www-form-urlencoded requests
-		if (count($_POST)) return;
+    protected function getRequestMethod()
+    {
+        return $_SERVER['REQUEST_METHOD'] ?? null;
+    }
 
-		$requestData = file_get_contents('php://input');
-		$requestJsonData = json_decode($requestData, true);
+    // Get the request POST data (normalized with passwords removed)
 
-		return is_array($requestJsonData)
-			? $this->removePasswords((new Serializer)->normalizeEach($requestJsonData))
-			: $requestData;
-	}
+    protected function getRequestUrl()
+    {
+        $https = ($_SERVER['HTTPS'] ?? null) == 'on';
+        $host = $_SERVER['HTTP_HOST'] ?? null;
+        $addr = $_SERVER['SERVER_ADDR'] ?? null;
+        $port = $_SERVER['SERVER_PORT'] ?? null;
+        $uri = $_SERVER['REQUEST_URI'] ?? null;
 
-	// Get the request headers
-	protected function getRequestHeaders()
-	{
-		$headers = [];
+        $scheme = $https ? 'https' : 'http';
+        $host = $host ?: $addr;
+        $port = (!$https && $port != 80 || $https && $port != 443) ? ":{$port}" : '';
 
-		foreach ($_SERVER as $key => $value) {
-			if (substr($key, 0, 5) !== 'HTTP_') continue;
+        // remove port number from the host
+        $host = $host ? preg_replace('/:\d+$/', '', trim($host)) : null;
 
-			$header = substr($key, 5);
-			$header = str_replace('_', ' ', $header);
-			$header = ucwords(strtolower($header));
-			$header = str_replace(' ', '-', $header);
+        return "{$scheme}://{$host}{$port}{$uri}";
+    }
 
-			$headers[$header] = array_merge($headers[$header] ?? [], [ $value ]);
-		}
+    // Get the request body data (attempt to parse as json, normalized with passwords removed)
 
-		ksort($headers);
+    protected function getRequestUri()
+    {
+        return $_SERVER['REQUEST_URI'] ?? null;
+    }
 
-		return $headers;
-	}
+    // Get the request headers
 
-	// Get the request method
-	protected function getRequestMethod()
-	{
-		return $_SERVER['REQUEST_METHOD'] ?? null;
-	}
+    protected function getRequestHeaders()
+    {
+        $headers = [];
 
-	// Get the response time
-	protected function getRequestTime()
-	{
-		return $_SERVER['REQUEST_TIME_FLOAT'] ?? null;
-	}
+        foreach ($_SERVER as $key => $value) {
+            if (substr($key, 0, 5) !== 'HTTP_') continue;
 
-	// Get the request URL
-	protected function getRequestUrl()
-	{
-		$https = ($_SERVER['HTTPS'] ?? null) == 'on';
-		$host = $_SERVER['HTTP_HOST'] ?? null;
-		$addr = $_SERVER['SERVER_ADDR'] ?? null;
-		$port = $_SERVER['SERVER_PORT'] ?? null;
-		$uri = $_SERVER['REQUEST_URI'] ?? null;
+            $header = substr($key, 5);
+            $header = str_replace('_', ' ', $header);
+            $header = ucwords(strtolower($header));
+            $header = str_replace(' ', '-', $header);
 
-		$scheme = $https ? 'https' : 'http';
-		$host = $host ?: $addr;
-		$port = (! $https && $port != 80 || $https && $port != 443) ? ":{$port}" : '';
+            $headers[$header] = array_merge($headers[$header] ?? [], [$value]);
+        }
 
-		// remove port number from the host
-		$host = $host ? preg_replace('/:\d+$/', '', trim($host)) : null;
+        ksort($headers);
 
-		return "{$scheme}://{$host}{$port}{$uri}";
-	}
+        return $headers;
+    }
 
-	// Get the request URI
-	protected function getRequestUri()
-	{
-		return $_SERVER['REQUEST_URI'] ?? null;
-	}
+    // Get the request method
 
-	// Get the response status code
-	protected function getResponseStatus()
-	{
-		return http_response_code();
-	}
+    protected function getGetData()
+    {
+        return $this->removePasswords((new Serializer)->normalizeEach($_GET));
+    }
 
-	// Get the response time (current time, assuming most of the application code has already run at this point)
-	protected function getResponseTime()
-	{
-		return microtime(true);
-	}
+    // Get the response time
 
-	// Get the session data (normalized with passwords removed)
-	protected function getSessionData()
-	{
-		if (! isset($_SESSION)) return [];
+    protected function getPostData()
+    {
+        return $this->removePasswords((new Serializer)->normalizeEach($_POST));
+    }
 
-		return $this->removePasswords((new Serializer)->normalizeEach($_SESSION));
-	}
+    // Get the request URL
 
-	// Get the peak memory usage in bytes
-	protected function getMemoryUsage()
-	{
-		return memory_get_peak_usage(true);
-	}
+    protected function getRequestData()
+    {
+        // The data will already be parsed into POST data by PHP in case of application/x-www-form-urlencoded requests
+        if (count($_POST)) return;
+
+        $requestData = file_get_contents('php://input');
+        $requestJsonData = json_decode($requestData, true);
+
+        return is_array($requestJsonData)
+            ? $this->removePasswords((new Serializer)->normalizeEach($requestJsonData))
+            : $requestData;
+    }
+
+    // Get the request URI
+
+    protected function getSessionData()
+    {
+        if (!isset($_SESSION)) return [];
+
+        return $this->removePasswords((new Serializer)->normalizeEach($_SESSION));
+    }
+
+    // Get the response status code
+
+    protected function getCookies()
+    {
+        return $this->removePasswords((new Serializer)->normalizeEach($_COOKIE));
+    }
+
+    // Get the response time (current time, assuming most of the application code has already run at this point)
+
+    protected function getResponseStatus()
+    {
+        return http_response_code();
+    }
+
+    // Get the session data (normalized with passwords removed)
+
+    protected function getResponseTime()
+    {
+        return microtime(true);
+    }
+
+    // Get the peak memory usage in bytes
+
+    protected function getMemoryUsage()
+    {
+        return memory_get_peak_usage(true);
+    }
 }

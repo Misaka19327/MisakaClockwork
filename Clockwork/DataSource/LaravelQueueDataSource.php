@@ -2,107 +2,112 @@
 
 use Clockwork\Helpers\{Serializer, StackTrace};
 use Clockwork\Request\Request;
-
 use Illuminate\Queue\Queue;
 
 // Data source for Laravel queue component, provides dispatched queue jobs
 class LaravelQueueDataSource extends DataSource
 {
-	// Queue instance
-	protected $queue;
+    // Queue instance
+    protected $queue;
 
-	// Dispatched queue jobs
-	protected $jobs = [];
+    // Dispatched queue jobs
+    protected $jobs = [];
 
-	// Clockwork ID of the current request
-	protected $currentRequestId;
+    // Clockwork ID of the current request
+    protected $currentRequestId;
 
-	// Clockwork UUID of the current request
-	protected $currentRequestUuid;
+    // Clockwork UUID of the current request
+    protected $currentRequestUuid;
 
-	// Create a new data source instance, takes a queue as an argument
-	public function __construct(Queue $queue)
-	{
-		$this->queue = $queue;
-	}
+    // Create a new data source instance, takes a queue as an argument
+    public function __construct(Queue $queue)
+    {
+        $this->queue = $queue;
+    }
 
-	// Adds dispatched queue jobs to the request
-	public function resolve(Request $request)
-	{
-		$request->queueJobs = array_merge($request->queueJobs, $this->getJobs());
+    // Adds dispatched queue jobs to the request
+    public function resolve(Request $request)
+    {
+        $request->queueJobs = array_merge($request->queueJobs, $this->getJobs());
 
-		return $request;
-	}
+        return $request;
+    }
 
-	// Reset the data source to an empty state, clearing any collected data
-	public function reset()
-	{
-		$this->jobs = [];
-	}
+    // Reset the data source to an empty state, clearing any collected data
 
-	// Listen to the queue events
-	public function listenToEvents()
-	{
-		$this->queue->createPayloadUsing(function ($connection, $queue, $payload) {
-			$request = new Request;
+    protected function getJobs()
+    {
+        return array_map(function ($query) {
+            return array_merge($query, [
+                'data' => isset($query['data']) ? (new Serializer)->normalize($query['data']) : null
+            ]);
+        }, $this->jobs);
+    }
 
-			$this->registerJob([
-				'id'         => $request->id,
-				'uuid'       => $request->uuid,
-				'parentUuid' => $this->currentRequestUuid,
-				'connection' => $connection,
-				'queue'      => $queue,
-				'name'       => $payload['displayName'],
-				'data'       => $payload['data']['command'] ?? null,
-				'maxTries'   => $payload['maxTries'],
-				'timeout'    => $payload['timeout'],
-				'time'       => microtime(true)
-			]);
+    // Listen to the queue events
 
-			return [
-				'clockwork_id' => $request->id,
-				'clockwork_uuid' => $request->uuid,
-				'clockwork_parent_id' => $this->currentRequestId,
-				'clockwork_parent_uuid' => $this->currentRequestUuid
-			];
-		});
-	}
+    public function reset()
+    {
+        $this->jobs = [];
+    }
 
-	// Set Clockwork ID of the current request
-	public function setCurrentRequestId($requestId)
-	{
-		$this->currentRequestId = $requestId;
-		return $this;
-	}
+    // Set Clockwork ID of the current request
 
-	// Set Clockwork UUID of the current request
-	public function setCurrentRequestUuid($requestUuid)
-	{
-		$this->currentRequestUuid = $requestUuid;
-		return $this;
-	}
+    public function listenToEvents()
+    {
+        $this->queue->createPayloadUsing(function ($connection, $queue, $payload) {
+            $request = new Request;
 
-	// Collect a dispatched queue job
-	protected function registerJob(array $job)
-	{
-		$trace = StackTrace::get()->resolveViewName();
+            $this->registerJob([
+                'id' => $request->id,
+                'uuid' => $request->uuid,
+                'parentUuid' => $this->currentRequestUuid,
+                'connection' => $connection,
+                'queue' => $queue,
+                'name' => $payload['displayName'],
+                'data' => $payload['data']['command'] ?? null,
+                'maxTries' => $payload['maxTries'],
+                'timeout' => $payload['timeout'],
+                'time' => microtime(true)
+            ]);
 
-		$job = array_merge($job, [
-			'trace' => (new Serializer)->trace($trace)
-		]);
+            return [
+                'clockwork_id' => $request->id,
+                'clockwork_uuid' => $request->uuid,
+                'clockwork_parent_id' => $this->currentRequestId,
+                'clockwork_parent_uuid' => $this->currentRequestUuid
+            ];
+        });
+    }
 
-		if ($this->passesFilters([ $job ])) {
-			$this->jobs[] = $job;
-		}
-	}
+    // Set Clockwork UUID of the current request
 
-	// Get an array of dispatched queue jobs commands
-	protected function getJobs()
-	{
-		return array_map(function ($query) {
-			return array_merge($query, [
-				'data' => isset($query['data']) ? (new Serializer)->normalize($query['data']) : null
-			]);
-		}, $this->jobs);
-	}
+    protected function registerJob(array $job)
+    {
+        $trace = StackTrace::get()->resolveViewName();
+
+        $job = array_merge($job, [
+            'trace' => (new Serializer)->trace($trace)
+        ]);
+
+        if ($this->passesFilters([$job])) {
+            $this->jobs[] = $job;
+        }
+    }
+
+    // Collect a dispatched queue job
+
+    public function setCurrentRequestId($requestId)
+    {
+        $this->currentRequestId = $requestId;
+        return $this;
+    }
+
+    // Get an array of dispatched queue jobs commands
+
+    public function setCurrentRequestUuid($requestUuid)
+    {
+        $this->currentRequestUuid = $requestUuid;
+        return $this;
+    }
 }

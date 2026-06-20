@@ -4,5 +4,5 @@ use Illuminate\Database\SQLiteConnection;
 
 class CapturingSqliteConnection extends SQLiteConnection
 {
-	use CapturesQueryResults;
+    use CapturesQueryResults;
 }

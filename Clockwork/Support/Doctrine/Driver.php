@@ -6,17 +6,17 @@ use Doctrine\DBAL\Driver\Middleware\AbstractDriverMiddleware;
 // Part of the Clockwork logging middleware, should not be used directly
 class Driver extends AbstractDriverMiddleware
 {
-	protected $onQuery;
+    protected $onQuery;
 
-	public function __construct(DriverInterface $driver, $onQuery)
-	{
-		parent::__construct($driver);
+    public function __construct(DriverInterface $driver, $onQuery)
+    {
+        parent::__construct($driver);
 
-		$this->onQuery = $onQuery;
-	}
+        $this->onQuery = $onQuery;
+    }
 
-	public function connect(array $params): Connection
-	{
-		return new Connection(parent::connect($params), $this->onQuery);
-	}
+    public function connect(array $params): Connection
+    {
+        return new Connection(parent::connect($params), $this->onQuery);
+    }
 }

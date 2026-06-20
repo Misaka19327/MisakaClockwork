@@ -4,8 +4,8 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 class ClockworkBundle extends Bundle
 {
-	protected function getContainerExtensionClass(): string
-	{
-		return ClockworkExtension::class;
-	}
+    protected function getContainerExtensionClass(): string
+    {
+        return ClockworkExtension::class;
+    }
 }

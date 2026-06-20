@@ -4,5 +4,5 @@ use Illuminate\Database\MySqlConnection;
 
 class CapturingMySqlConnection extends MySqlConnection
 {
-	use CapturesQueryResults;
+    use CapturesQueryResults;
 }

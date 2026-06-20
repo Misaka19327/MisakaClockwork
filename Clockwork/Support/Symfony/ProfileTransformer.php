@@ -3,300 +3,309 @@
 use Clockwork\Helpers\Serializer;
 use Clockwork\Request\{Log, Request};
 use Clockwork\Request\Timeline\Timeline;
-
 use Symfony\Component\HttpKernel\Profiler\Profile;
 
 class ProfileTransformer
 {
-	public function transform(Profile $profile)
-	{
-		$request = new Request([ 'id' => $profile->getToken() ]);
+    public function transform(Profile $profile)
+    {
+        $request = new Request(['id' => $profile->getToken()]);
 
-		$this->transformCacheData($profile, $request);
-		$this->transformDoctrineData($profile, $request);
-		$this->transformEventsData($profile, $request);
-		$this->transformLoggerData($profile, $request);
-		$this->transformRequestData($profile, $request);
-		$this->transformTimeData($profile, $request);
-		$this->transformTwigData($profile, $request);
+        $this->transformCacheData($profile, $request);
+        $this->transformDoctrineData($profile, $request);
+        $this->transformEventsData($profile, $request);
+        $this->transformLoggerData($profile, $request);
+        $this->transformRequestData($profile, $request);
+        $this->transformTimeData($profile, $request);
+        $this->transformTwigData($profile, $request);
 
-		$request->subrequests = $this->getSubrequests($profile);
+        $request->subrequests = $this->getSubrequests($profile);
 
-		return $request;
-	}
+        return $request;
+    }
 
-	// Cache collector
+    // Cache collector
 
-	protected function transformCacheData(Profile $profile, Request $request)
-	{
-		if (! $profile->hasCollector('cache')) return;
+    protected function transformCacheData(Profile $profile, Request $request)
+    {
+        if (!$profile->hasCollector('cache')) return;
 
-		$data = $profile->getCollector('cache');
+        $data = $profile->getCollector('cache');
 
-		$request->cacheQueries = $this->getCacheQueries($data);
-		$request->cacheReads   = $data->getTotals()['reads'];
-		$request->cacheHits    = $data->getTotals()['hits'];
-		$request->cacheWrites  = $data->getTotals()['writes'];
-		$request->cacheDeletes = $data->getTotals()['deletes'];
-	}
+        $request->cacheQueries = $this->getCacheQueries($data);
+        $request->cacheReads = $data->getTotals()['reads'];
+        $request->cacheHits = $data->getTotals()['hits'];
+        $request->cacheWrites = $data->getTotals()['writes'];
+        $request->cacheDeletes = $data->getTotals()['deletes'];
+    }
 
-	protected function getCacheQueries($data)
-	{
-		return array_reduce(array_map(function ($queries, $connection) {
-			return array_filter(array_map(function ($query) use ($connection) {
-				$value = $query['result'];
+    protected function getCacheQueries($data)
+    {
+        return array_reduce(array_map(function ($queries, $connection) {
+            return array_filter(array_map(function ($query) use ($connection) {
+                $value = $query['result'];
 
-				if (! is_array($value) || ! count($value)) return;
+                if (!is_array($value) || !count($value)) return;
 
-				return [
-					'connection' => $connection,
-					'time'       => $query['start'],
-					'type'       => array_values($value)[0] ? 'hit' : 'miss',
-					'key'        => array_keys($value)[0],
-					'value'      => '',
-					'duration'   => $query['end'] - $query['start']
-				];
-			}, $queries));
-		}, $this->unwrap($data->getCalls()), array_keys($this->unwrap($data->getCalls()))), function ($all, $queries) {
-			return array_merge($all, $queries);
-		}, []);
-	}
+                return [
+                    'connection' => $connection,
+                    'time' => $query['start'],
+                    'type' => array_values($value)[0] ? 'hit' : 'miss',
+                    'key' => array_keys($value)[0],
+                    'value' => '',
+                    'duration' => $query['end'] - $query['start']
+                ];
+            }, $queries));
+        }, $this->unwrap($data->getCalls()), array_keys($this->unwrap($data->getCalls()))), function ($all, $queries) {
+            return array_merge($all, $queries);
+        }, []);
+    }
 
-	// Doctrine collector
+    // Doctrine collector
 
-	protected function transformDoctrineData(Profile $profile, Request $request)
-	{
-		if (! $profile->hasCollector('db')) return;
+    protected function unwrap($data)
+    {
+        if ($data instanceof \Symfony\Component\VarDumper\Cloner\Data) {
+            return $data->getValue(true);
+        } elseif ($data instanceof \Symfony\Component\HttpFoundation\ParameterBag) {
+            return array_map(function ($val) {
+                return $val->getValue();
+            }, $data->all());
+        } elseif (is_array($data)) {
+            return array_map(function ($item) {
+                return $this->unwrap($item);
+            }, $data);
+        }
 
-		$data = $profile->getCollector('db');
+        return $data;
+    }
 
-		$request->databaseDuration = $data->getTime();
-		$request->databaseQueries = $this->getQueries($data);
-	}
+    protected function transformDoctrineData(Profile $profile, Request $request)
+    {
+        if (!$profile->hasCollector('db')) return;
 
-	protected function getQueries($data)
-	{
-		return array_reduce(array_map(function ($queries, $connection) {
-			return array_filter(array_map(function ($query) use ($connection) {
-				return [
-					'query'      => $this->createRunnableQuery($query['sql'], $this->unwrap($query['params'])),
-					'duration'   => $query['executionMS'] * 1000,
-					'connection' => $connection
-				];
-			}, $queries));
-		}, $data->getQueries(), array_keys($data->getQueries())), function ($all, $queries) {
-			return array_merge($all, $queries);
-		}, []);
-	}
+        $data = $profile->getCollector('db');
 
-	protected function createRunnableQuery($query, $bindings)
-	{
-		foreach ($bindings as $binding) {
-			$binding = \Doctrine\Bundle\DoctrineBundle\Twig\DoctrineExtension::escapeFunction($binding);
+        $request->databaseDuration = $data->getTime();
+        $request->databaseQueries = $this->getQueries($data);
+    }
 
-			// escape backslashes in the binding (preg_replace requires to do so)
-			$binding = str_replace('\\', '\\\\', $binding);
+    protected function getQueries($data)
+    {
+        return array_reduce(array_map(function ($queries, $connection) {
+            return array_filter(array_map(function ($query) use ($connection) {
+                return [
+                    'query' => $this->createRunnableQuery($query['sql'], $this->unwrap($query['params'])),
+                    'duration' => $query['executionMS'] * 1000,
+                    'connection' => $connection
+                ];
+            }, $queries));
+        }, $data->getQueries(), array_keys($data->getQueries())), function ($all, $queries) {
+            return array_merge($all, $queries);
+        }, []);
+    }
 
-			$query = preg_replace('/\?/', $binding, $query, 1);
-		}
+    // Events collector
 
-		// highlight keywords
-		$keywords = [
-			'select', 'insert', 'update', 'delete', 'where', 'from', 'limit', 'is', 'null', 'having', 'group by',
-			'order by', 'asc', 'desc'
-		];
-		$regexp = '/\b' . implode('\b|\b', $keywords) . '\b/i';
+    protected function createRunnableQuery($query, $bindings)
+    {
+        foreach ($bindings as $binding) {
+            $binding = \Doctrine\Bundle\DoctrineBundle\Twig\DoctrineExtension::escapeFunction($binding);
 
-		$query = preg_replace_callback($regexp, function ($match) { return strtoupper($match[0]); }, $query);
+            // escape backslashes in the binding (preg_replace requires to do so)
+            $binding = str_replace('\\', '\\\\', $binding);
 
-		return $query;
-	}
+            $query = preg_replace('/\?/', $binding, $query, 1);
+        }
 
-	// Events collector
+        // highlight keywords
+        $keywords = [
+            'select', 'insert', 'update', 'delete', 'where', 'from', 'limit', 'is', 'null', 'having', 'group by',
+            'order by', 'asc', 'desc'
+        ];
+        $regexp = '/\b' . implode('\b|\b', $keywords) . '\b/i';
 
-	protected function transformEventsData(Profile $profile, Request $request)
-	{
-		if (! $profile->hasCollector('events')) return;
+        $query = preg_replace_callback($regexp, function ($match) {
+            return strtoupper($match[0]);
+        }, $query);
 
-		$data = $profile->getCollector('events');
+        return $query;
+    }
 
-		$request->events = $this->getEvents($data);
-	}
+    protected function transformEventsData(Profile $profile, Request $request)
+    {
+        if (!$profile->hasCollector('events')) return;
 
-	protected function getEvents($data)
-	{
-		$handledEvents = array_values(array_reduce($this->unwrap($data->getCalledListeners('event_dispatcher')), function ($events, $listener) {
-			if (! isset($events[$listener['event']])) {
-				$events[$listener['event']] = [ 'event' => $listener['event'], 'listeners' => [] ];
-			}
+        $data = $profile->getCollector('events');
 
-			$events[$listener['event']]['listeners'][] = $listener['stub'];
+        $request->events = $this->getEvents($data);
+    }
 
-			return $events;
-		}, []));
+    // Log collector
 
-		$orphanedEvents = array_map(function ($event) {
-			return [ 'event' => $event ];
-		}, $this->unwrap($data->getOrphanedEvents('event_dispatcher')));
+    protected function getEvents($data)
+    {
+        $handledEvents = array_values(array_reduce($this->unwrap($data->getCalledListeners('event_dispatcher')), function ($events, $listener) {
+            if (!isset($events[$listener['event']])) {
+                $events[$listener['event']] = ['event' => $listener['event'], 'listeners' => []];
+            }
 
-		return array_merge($handledEvents, $orphanedEvents);
-	}
+            $events[$listener['event']]['listeners'][] = $listener['stub'];
 
-	// Log collector
+            return $events;
+        }, []));
 
-	protected function transformLoggerData(Profile $profile, Request $request)
-	{
-		if (! $profile->hasCollector('logger')) return;
+        $orphanedEvents = array_map(function ($event) {
+            return ['event' => $event];
+        }, $this->unwrap($data->getOrphanedEvents('event_dispatcher')));
 
-		$data = $profile->getCollector('logger');
+        return array_merge($handledEvents, $orphanedEvents);
+    }
 
-		$request->log()->merge($this->getLog($data));
-	}
+    protected function transformLoggerData(Profile $profile, Request $request)
+    {
+        if (!$profile->hasCollector('logger')) return;
 
-	protected function getLog($data)
-	{
-		$messages = array_map(function ($log) {
-			$context = $log['context'] ?? [];
-			$replacements = array_filter($context, function ($v) { return ! is_array($v) && ! is_object($v) && ! is_resource($v); });
+        $data = $profile->getCollector('logger');
 
-			return [
-				'message' => str_replace(
-					array_map(function ($v) { return "{{$v}}"; }, array_keys($replacements)),
-					array_values($replacements),
-					$log['message']
-				),
-				'context' => (new Serializer)->normalize($log['context']),
-				'level'   => strtolower($log['priorityName']),
-				'time'    => $log['timestamp']
-			];
-		}, $this->unwrap($data->getLogs()));
+        $request->log()->merge($this->getLog($data));
+    }
 
-		return new Log($messages);
-	}
+    // Request collector
 
-	// Request collector
+    protected function getLog($data)
+    {
+        $messages = array_map(function ($log) {
+            $context = $log['context'] ?? [];
+            $replacements = array_filter($context, function ($v) {
+                return !is_array($v) && !is_object($v) && !is_resource($v);
+            });
 
-	protected function transformRequestData(Profile $profile, Request $request)
-	{
-		if (! $profile->hasCollector('request')) return;
+            return [
+                'message' => str_replace(
+                    array_map(function ($v) {
+                        return "{{$v}}";
+                    }, array_keys($replacements)),
+                    array_values($replacements),
+                    $log['message']
+                ),
+                'context' => (new Serializer)->normalize($log['context']),
+                'level' => strtolower($log['priorityName']),
+                'time' => $log['timestamp']
+            ];
+        }, $this->unwrap($data->getLogs()));
 
-		$data = $profile->getCollector('request');
+        return new Log($messages);
+    }
 
-		$request->method         = $data->getMethod();
-		$request->uri            = $data->getPathInfo();
-		$request->controller     = $this->getController($data);
-		$request->responseStatus = $data->getStatusCode();
-		$request->headers        = $this->unwrap($data->getRequestHeaders());
-		$request->getData        = $this->unwrap($data->getRequestQuery());
-		$request->postData       = $this->unwrap($data->getRequestRequest());
-		$request->cookies        = $this->unwrap($data->getRequestCookies());
-		$request->sessionData    = (new Serializer)->normalizeEach($this->unwrap($data->getSessionAttributes()));
-	}
+    protected function transformRequestData(Profile $profile, Request $request)
+    {
+        if (!$profile->hasCollector('request')) return;
 
-	protected function getController($data)
-	{
-		$controller = $this->unwrap($data->getController());
+        $data = $profile->getCollector('request');
 
-		if (! is_array($controller)) return $controller;
+        $request->method = $data->getMethod();
+        $request->uri = $data->getPathInfo();
+        $request->controller = $this->getController($data);
+        $request->responseStatus = $data->getStatusCode();
+        $request->headers = $this->unwrap($data->getRequestHeaders());
+        $request->getData = $this->unwrap($data->getRequestQuery());
+        $request->postData = $this->unwrap($data->getRequestRequest());
+        $request->cookies = $this->unwrap($data->getRequestCookies());
+        $request->sessionData = (new Serializer)->normalizeEach($this->unwrap($data->getSessionAttributes()));
+    }
 
-		return isset($controller['method'])
-			? "{$controller['class']}@{$controller['method']}"
-			: $controller['class'];
-	}
+    // Time collector
 
-	// Time collector
+    protected function getController($data)
+    {
+        $controller = $this->unwrap($data->getController());
 
-	protected function transformTimeData(Profile $profile, Request $request)
-	{
-		if (! $profile->hasCollector('time')) return;
+        if (!is_array($controller)) return $controller;
 
-		$data = $profile->getCollector('time');
+        return isset($controller['method'])
+            ? "{$controller['class']}@{$controller['method']}"
+            : $controller['class'];
+    }
 
-		$request->time         = $data->getStartTime() / 1000;
-		$request->responseTime = $this->getResponseTime($data);
+    protected function transformTimeData(Profile $profile, Request $request)
+    {
+        if (!$profile->hasCollector('time')) return;
 
-		$request->timeline()->merge($this->getTimeline($data));
-	}
+        $data = $profile->getCollector('time');
 
-	protected function getResponseTime($data)
-	{
-		$lastEvent = $data->getEvents()['__section__'];
+        $request->time = $data->getStartTime() / 1000;
+        $request->responseTime = $this->getResponseTime($data);
 
-		return ($lastEvent->getOrigin() + $lastEvent->getDuration()) / 1000;
-	}
+        $request->timeline()->merge($this->getTimeline($data));
+    }
 
-	protected function getTimeline($data)
-	{
-		$events = array_map(function ($event, $name) {
-			if ($name == '__section__') {
-				$name = 'Application runtime';
-			} elseif ($name == '__section__.child') {
-				$name = 'Subrequest';
-			}
+    protected function getResponseTime($data)
+    {
+        $lastEvent = $data->getEvents()['__section__'];
 
-			return [
-				'start'       => ($event->getOrigin() + $event->getStartTime()) / 1000,
-				'end'         => ($event->getOrigin() + $event->getEndTime()) / 1000,
-				'duration'    => $event->getDuration(),
-				'description' => $name,
-				'data'        => []
-			];
-		}, $data->getEvents(), array_keys($data->getEvents()));
+        return ($lastEvent->getOrigin() + $lastEvent->getDuration()) / 1000;
+    }
 
-		$topEvent = $data->getEvents()['__section__'];
-		array_unshift($events, [
-			'start'       => $start = $data->getStartTime() / 1000,
-			'end'         => $end = ($topEvent->getOrigin() + $topEvent->getStartTime()) / 1000,
-			'duration'    => ($end - $start) * 1000,
-			'description' => 'Symfony initialization',
-			'data'        => []
-		]);
+    // Twig collector
 
-		return new Timeline($events);
-	}
+    protected function getTimeline($data)
+    {
+        $events = array_map(function ($event, $name) {
+            if ($name == '__section__') {
+                $name = 'Application runtime';
+            } elseif ($name == '__section__.child') {
+                $name = 'Subrequest';
+            }
 
-	// Twig collector
+            return [
+                'start' => ($event->getOrigin() + $event->getStartTime()) / 1000,
+                'end' => ($event->getOrigin() + $event->getEndTime()) / 1000,
+                'duration' => $event->getDuration(),
+                'description' => $name,
+                'data' => []
+            ];
+        }, $data->getEvents(), array_keys($data->getEvents()));
 
-	protected function transformTwigData(Profile $profile, Request $request)
-	{
-		if (! $profile->hasCollector('twig')) return;
+        $topEvent = $data->getEvents()['__section__'];
+        array_unshift($events, [
+            'start' => $start = $data->getStartTime() / 1000,
+            'end' => $end = ($topEvent->getOrigin() + $topEvent->getStartTime()) / 1000,
+            'duration' => ($end - $start) * 1000,
+            'description' => 'Symfony initialization',
+            'data' => []
+        ]);
 
-		$data = $profile->getCollector('twig');
+        return new Timeline($events);
+    }
 
-		$request->viewsData = $this->getViews($data);
-	}
+    protected function transformTwigData(Profile $profile, Request $request)
+    {
+        if (!$profile->hasCollector('twig')) return;
 
-	protected function getViews($data)
-	{
-		return array_map(function ($template) {
-			return [
-				'description' => 'Rendering a view',
-				'data' => [ 'name' => $template, 'data' => [] ]
-			];
-		}, array_keys($data->getTemplates()));
-	}
+        $data = $profile->getCollector('twig');
 
-	protected function getSubrequests($profile)
-	{
-		return array_map(function ($child) {
-			return [
-				'url'  => urlencode($child->getCollector('request')->getPathInfo()),
-				'id'   => $child->getToken(),
-				'path' => null
-			];
-		}, $profile->getChildren());
-	}
+        $request->viewsData = $this->getViews($data);
+    }
 
-	protected function unwrap($data)
-	{
-		if ($data instanceof \Symfony\Component\VarDumper\Cloner\Data) {
-			return $data->getValue(true);
-		} elseif ($data instanceof \Symfony\Component\HttpFoundation\ParameterBag) {
-			return array_map(function ($val) { return $val->getValue(); }, $data->all());
-		} elseif (is_array($data)) {
-			return array_map(function ($item) { return $this->unwrap($item); }, $data);
-		}
+    protected function getViews($data)
+    {
+        return array_map(function ($template) {
+            return [
+                'description' => 'Rendering a view',
+                'data' => ['name' => $template, 'data' => []]
+            ];
+        }, array_keys($data->getTemplates()));
+    }
 
-		return $data;
-	}
+    protected function getSubrequests($profile)
+    {
+        return array_map(function ($child) {
+            return [
+                'url' => urlencode($child->getCollector('request')->getPathInfo()),
+                'id' => $child->getToken(),
+                'path' => null
+            ];
+        }, $profile->getChildren());
+    }
 }

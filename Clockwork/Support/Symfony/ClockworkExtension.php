@@ -7,16 +7,16 @@ use Symfony\Component\HttpKernel\DependencyInjection\ConfigurableExtension;
 
 class ClockworkExtension extends ConfigurableExtension
 {
-	public function loadInternal(array $config, ContainerBuilder $container): void
-	{
-		$loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/Resources/config'));
-		$loader->load('clockwork.php');
+    public function loadInternal(array $config, ContainerBuilder $container): void
+    {
+        $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/Resources/config'));
+        $loader->load('clockwork.php');
 
-		$container->getDefinition(ClockworkSupport::class)->replaceArgument('$config', $config);
-	}
+        $container->getDefinition(ClockworkSupport::class)->replaceArgument('$config', $config);
+    }
 
-	public function getConfiguration(array $config, ContainerBuilder $container)
-	{
-		return new ClockworkConfiguration($container->getParameter('kernel.debug'));
-	}
+    public function getConfiguration(array $config, ContainerBuilder $container)
+    {
+        return new ClockworkConfiguration($container->getParameter('kernel.debug'));
+    }
 }

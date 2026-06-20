@@ -56,12 +56,81 @@ class ClockworkMcpServer
         }
     }
 
+    private function makeStorage()
+    {
+        $dsn = getenv('CLOCKWORK_MCP_STORAGE_DSN');
+
+        if ($dsn) {
+            $this->storageMeta = [
+                'available' => true,
+                'driver' => 'sql',
+                'dsn' => $dsn,
+                'table' => getenv('CLOCKWORK_MCP_STORAGE_SQL_TABLE') ?: 'clockwork'
+            ];
+
+            return new SqlStorage(
+                $dsn,
+                $this->storageMeta['table'],
+                getenv('CLOCKWORK_MCP_STORAGE_SQL_USERNAME') ?: null,
+                getenv('CLOCKWORK_MCP_STORAGE_SQL_PASSWORD') ?: null,
+                false
+            );
+        }
+
+        $path = $this->resolveStoragePath();
+
+        if (!is_dir($path)) {
+            throw new \RuntimeException("Clockwork storage path does not exist: {$path}");
+        }
+
+        $this->storageMeta = [
+            'available' => true,
+            'driver' => 'files',
+            'path' => $path
+        ];
+
+        return new FileStorage($path);
+    }
+
+    private function resolveStoragePath()
+    {
+        $configured = getenv('CLOCKWORK_MCP_STORAGE_PATH');
+
+        if ($configured) {
+            return $this->normalizePath($configured);
+        }
+
+        $candidates = [
+            $this->rootPath . '/storage/clockwork',
+            $this->rootPath . '/tmp_clockwork_storage'
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_dir($candidate)) return $candidate;
+        }
+
+        return $candidates[0];
+    }
+
+    private function normalizePath($path)
+    {
+        if ($path === '') return $path;
+
+        $path = str_replace('\\', '/', $path);
+
+        if (preg_match('/^(?:[A-Za-z]:\/|\/)/', $path)) {
+            return $path;
+        }
+
+        return $this->rootPath . '/' . ltrim($path, '/');
+    }
+
     public function run()
     {
         while ($this->running && ($payload = $this->readMessage()) !== null) {
             $message = json_decode($payload, true);
 
-            if (! is_array($message)) {
+            if (!is_array($message)) {
                 $this->respondError(null, -32700, 'Invalid JSON payload.');
                 continue;
             }
@@ -70,13 +139,80 @@ class ClockworkMcpServer
         }
     }
 
+    private function readMessage()
+    {
+        $headers = [];
+
+        while (($line = fgets($this->stdin)) !== false) {
+            $line = rtrim($line, "\r\n");
+
+            if ($line === '') break;
+
+            $parts = explode(':', $line, 2);
+
+            if (count($parts) !== 2) continue;
+
+            $headers[strtolower(trim($parts[0]))] = trim($parts[1]);
+        }
+
+        if (!count($headers)) return null;
+
+        if (!isset($headers['content-length'])) {
+            throw new \RuntimeException('Missing Content-Length header.');
+        }
+
+        $length = (int)$headers['content-length'];
+        $body = '';
+
+        while (strlen($body) < $length) {
+            $chunk = fread($this->stdin, $length - strlen($body));
+
+            if ($chunk === false || $chunk === '') break;
+
+            $body .= $chunk;
+        }
+
+        return $body;
+    }
+
+    private function respondError($id, $code, $message, $data = null)
+    {
+        $error = [
+            'code' => $code,
+            'message' => $message
+        ];
+
+        if ($data !== null) $error['data'] = $data;
+
+        $this->writeMessage([
+            'jsonrpc' => '2.0',
+            'id' => $id,
+            'error' => $error
+        ]);
+    }
+
+    private function writeMessage(array $message)
+    {
+        $json = json_encode($message, JSON_UNESCAPED_SLASHES);
+
+        if ($json === false) {
+            fwrite($this->stderr, "Failed to encode MCP response.\n");
+            return;
+        }
+
+        $payload = "Content-Length: " . strlen($json) . "\r\n\r\n" . $json;
+
+        fwrite($this->stdout, $payload);
+        fflush($this->stdout);
+    }
+
     private function handleMessage(array $message)
     {
         $method = isset($message['method']) ? $message['method'] : null;
         $id = array_key_exists('id', $message) ? $message['id'] : null;
         $params = isset($message['params']) && is_array($message['params']) ? $message['params'] : [];
 
-        if (! $method) {
+        if (!$method) {
             if ($id !== null) $this->respondError($id, -32600, 'Missing method.');
             return;
         }
@@ -113,7 +249,7 @@ class ClockworkMcpServer
                 return;
 
             case 'tools/list':
-                $this->respond($id, [ 'tools' => $this->toolDefinitions() ]);
+                $this->respond($id, ['tools' => $this->toolDefinitions()]);
                 return;
 
             case 'tools/call':
@@ -123,6 +259,26 @@ class ClockworkMcpServer
             default:
                 if ($id !== null) $this->respondError($id, -32601, "Unsupported method: {$method}");
         }
+    }
+
+    private function respond($id, $result)
+    {
+        $this->writeMessage([
+            'jsonrpc' => '2.0',
+            'id' => $id,
+            'result' => $result
+        ]);
+    }
+
+    private function negotiateProtocolVersion(array $params)
+    {
+        $requested = isset($params['protocolVersion']) ? (string)$params['protocolVersion'] : '';
+
+        foreach ([self::MCP_PROTOCOL_VERSION, '2025-06-18', '2024-11-05'] as $supported) {
+            if ($requested === $supported) return $supported;
+        }
+
+        return self::MCP_PROTOCOL_VERSION;
     }
 
     private function toolDefinitions()
@@ -154,7 +310,7 @@ class ClockworkMcpServer
                         ],
                         'type' => [
                             'type' => 'string',
-                            'enum' => [ 'request', 'command', 'queue-job', 'test' ],
+                            'enum' => ['request', 'command', 'queue-job', 'test'],
                             'description' => 'Restrict results to a single Clockwork request type.'
                         ],
                         'method' => [
@@ -191,7 +347,7 @@ class ClockworkMcpServer
                         ],
                         'direction' => [
                             'type' => 'string',
-                            'enum' => [ 'previous', 'next' ],
+                            'enum' => ['previous', 'next'],
                             'description' => 'Fetch requests before or after fromId.'
                         ]
                     ]
@@ -213,7 +369,7 @@ class ClockworkMcpServer
                         ],
                         'view' => [
                             'type' => 'string',
-                            'enum' => [ 'summary', 'raw' ],
+                            'enum' => ['summary', 'raw'],
                             'description' => 'summary returns a compact view, raw returns the full request payload without updateToken.'
                         ]
                     ]
@@ -268,11 +424,26 @@ class ClockworkMcpServer
         }
     }
 
+    private function toolSuccess(array $payload)
+    {
+        $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        return [
+            'content' => [
+                [
+                    'type' => 'text',
+                    'text' => $json === false ? '{}' : $json
+                ]
+            ],
+            'structuredContent' => $payload
+        ];
+    }
+
     private function storageStatus()
     {
         $status = $this->storageMeta;
 
-        if (! $this->storage) {
+        if (!$this->storage) {
             return $status;
         }
 
@@ -282,123 +453,6 @@ class ClockworkMcpServer
         $status['latestRequest'] = $latest ? $this->summarizeRequest($latest) : null;
 
         return $status;
-    }
-
-    private function listRequests(array $arguments)
-    {
-        $this->requireStorage();
-
-        $limit = isset($arguments['limit']) ? (int) $arguments['limit'] : 20;
-        $limit = max(1, min($limit, 100));
-
-        $search = $this->makeSearch($arguments);
-        $direction = isset($arguments['direction']) ? $arguments['direction'] : null;
-        $fromId = isset($arguments['fromId']) ? (string) $arguments['fromId'] : null;
-
-        if ($fromId && $direction === 'previous') {
-            $requests = $this->storage->previous($fromId, $limit, $search);
-        } elseif ($fromId && $direction === 'next') {
-            $requests = $this->storage->next($fromId, $limit, $search);
-        } else {
-            $requests = $this->storage->all($search);
-            usort($requests, function (Request $left, Request $right) {
-                if ($left->time == $right->time) return 0;
-                return $left->time > $right->time ? -1 : 1;
-            });
-            $requests = array_slice($requests, 0, $limit);
-        }
-
-        return [
-            'storage' => $this->storageMeta,
-            'count' => count($requests),
-            'requests' => array_map(function (Request $request) {
-                return $this->summarizeRequest($request);
-            }, $requests)
-        ];
-    }
-
-    private function getRequestPayload(array $arguments)
-    {
-        $this->requireStorage();
-
-        $request = $this->requireRequest($arguments);
-        $view = isset($arguments['view']) ? $arguments['view'] : 'raw';
-
-        if ($view === 'summary') {
-            return [
-                'storage' => $this->storageMeta,
-                'request' => $this->summarizeRequest($request)
-            ];
-        }
-
-        return [
-            'storage' => $this->storageMeta,
-            'request' => $request->except([ 'updateToken' ])
-        ];
-    }
-
-    private function getEventDetailsPayload(array $arguments)
-    {
-        $this->requireStorage();
-
-        $request = $this->requireRequest($arguments);
-
-        return [
-            'storage' => $this->storageMeta,
-            'request' => $request->toEventDetails()
-        ];
-    }
-
-    private function requireRequest(array $arguments)
-    {
-        $id = isset($arguments['id']) ? trim((string) $arguments['id']) : '';
-        $uuid = isset($arguments['uuid']) ? trim((string) $arguments['uuid']) : '';
-
-        if ($id === '' && $uuid === '') {
-            throw new \InvalidArgumentException('Provide either id or uuid.');
-        }
-
-        $request = $id !== ''
-            ? $this->storage->find($id)
-            : $this->storage->findByUuid($uuid);
-
-        if (! $request) {
-            throw new \InvalidArgumentException('Clockwork request not found.');
-        }
-
-        return $request;
-    }
-
-    private function makeSearch(array $arguments)
-    {
-        $search = [];
-
-        if (isset($arguments['search']) && $arguments['search'] !== '') {
-            $search['search'] = (string) $arguments['search'];
-        }
-
-        foreach ([ 'uri', 'controller', 'method', 'type', 'name', 'status' ] as $field) {
-            if (! isset($arguments[$field]) || $arguments[$field] === '') continue;
-
-            $value = is_array($arguments[$field]) ? $arguments[$field] : [ (string) $arguments[$field] ];
-            $search[$field] = array_values(array_filter($value, function ($item) {
-                return $item !== null && $item !== '';
-            }));
-        }
-
-        $received = [];
-
-        if (isset($arguments['receivedAfter'])) {
-            $received[] = '>' . (int) $arguments['receivedAfter'];
-        }
-
-        if (isset($arguments['receivedBefore'])) {
-            $received[] = '<' . (int) $arguments['receivedBefore'];
-        }
-
-        if (count($received)) $search['received'] = $received;
-
-        return new Search($search);
     }
 
     private function summarizeRequest(Request $request)
@@ -442,60 +496,37 @@ class ClockworkMcpServer
         return $request->responseStatus;
     }
 
-    private function makeStorage()
+    private function listRequests(array $arguments)
     {
-        $dsn = getenv('CLOCKWORK_MCP_STORAGE_DSN');
+        $this->requireStorage();
 
-        if ($dsn) {
-            $this->storageMeta = [
-                'available' => true,
-                'driver' => 'sql',
-                'dsn' => $dsn,
-                'table' => getenv('CLOCKWORK_MCP_STORAGE_SQL_TABLE') ?: 'clockwork'
-            ];
+        $limit = isset($arguments['limit']) ? (int)$arguments['limit'] : 20;
+        $limit = max(1, min($limit, 100));
 
-            return new SqlStorage(
-                $dsn,
-                $this->storageMeta['table'],
-                getenv('CLOCKWORK_MCP_STORAGE_SQL_USERNAME') ?: null,
-                getenv('CLOCKWORK_MCP_STORAGE_SQL_PASSWORD') ?: null,
-                false
-            );
+        $search = $this->makeSearch($arguments);
+        $direction = isset($arguments['direction']) ? $arguments['direction'] : null;
+        $fromId = isset($arguments['fromId']) ? (string)$arguments['fromId'] : null;
+
+        if ($fromId && $direction === 'previous') {
+            $requests = $this->storage->previous($fromId, $limit, $search);
+        } elseif ($fromId && $direction === 'next') {
+            $requests = $this->storage->next($fromId, $limit, $search);
+        } else {
+            $requests = $this->storage->all($search);
+            usort($requests, function (Request $left, Request $right) {
+                if ($left->time == $right->time) return 0;
+                return $left->time > $right->time ? -1 : 1;
+            });
+            $requests = array_slice($requests, 0, $limit);
         }
 
-        $path = $this->resolveStoragePath();
-
-        if (! is_dir($path)) {
-            throw new \RuntimeException("Clockwork storage path does not exist: {$path}");
-        }
-
-        $this->storageMeta = [
-            'available' => true,
-            'driver' => 'files',
-            'path' => $path
+        return [
+            'storage' => $this->storageMeta,
+            'count' => count($requests),
+            'requests' => array_map(function (Request $request) {
+                return $this->summarizeRequest($request);
+            }, $requests)
         ];
-
-        return new FileStorage($path);
-    }
-
-    private function resolveStoragePath()
-    {
-        $configured = getenv('CLOCKWORK_MCP_STORAGE_PATH');
-
-        if ($configured) {
-            return $this->normalizePath($configured);
-        }
-
-        $candidates = [
-            $this->rootPath . '/storage/clockwork',
-            $this->rootPath . '/tmp_clockwork_storage'
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (is_dir($candidate)) return $candidate;
-        }
-
-        return $candidates[0];
     }
 
     private function requireStorage()
@@ -507,42 +538,87 @@ class ClockworkMcpServer
         );
     }
 
-    private function normalizePath($path)
+    private function makeSearch(array $arguments)
     {
-        if ($path === '') return $path;
+        $search = [];
 
-        $path = str_replace('\\', '/', $path);
-
-        if (preg_match('/^(?:[A-Za-z]:\/|\/)/', $path)) {
-            return $path;
+        if (isset($arguments['search']) && $arguments['search'] !== '') {
+            $search['search'] = (string)$arguments['search'];
         }
 
-        return $this->rootPath . '/' . ltrim($path, '/');
-    }
+        foreach (['uri', 'controller', 'method', 'type', 'name', 'status'] as $field) {
+            if (!isset($arguments[$field]) || $arguments[$field] === '') continue;
 
-    private function negotiateProtocolVersion(array $params)
-    {
-        $requested = isset($params['protocolVersion']) ? (string) $params['protocolVersion'] : '';
-
-        foreach ([ self::MCP_PROTOCOL_VERSION, '2025-06-18', '2024-11-05' ] as $supported) {
-            if ($requested === $supported) return $supported;
+            $value = is_array($arguments[$field]) ? $arguments[$field] : [(string)$arguments[$field]];
+            $search[$field] = array_values(array_filter($value, function ($item) {
+                return $item !== null && $item !== '';
+            }));
         }
 
-        return self::MCP_PROTOCOL_VERSION;
+        $received = [];
+
+        if (isset($arguments['receivedAfter'])) {
+            $received[] = '>' . (int)$arguments['receivedAfter'];
+        }
+
+        if (isset($arguments['receivedBefore'])) {
+            $received[] = '<' . (int)$arguments['receivedBefore'];
+        }
+
+        if (count($received)) $search['received'] = $received;
+
+        return new Search($search);
     }
 
-    private function toolSuccess(array $payload)
+    private function getRequestPayload(array $arguments)
     {
-        $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $this->requireStorage();
+
+        $request = $this->requireRequest($arguments);
+        $view = isset($arguments['view']) ? $arguments['view'] : 'raw';
+
+        if ($view === 'summary') {
+            return [
+                'storage' => $this->storageMeta,
+                'request' => $this->summarizeRequest($request)
+            ];
+        }
 
         return [
-            'content' => [
-                [
-                    'type' => 'text',
-                    'text' => $json === false ? '{}' : $json
-                ]
-            ],
-            'structuredContent' => $payload
+            'storage' => $this->storageMeta,
+            'request' => $request->except(['updateToken'])
+        ];
+    }
+
+    private function requireRequest(array $arguments)
+    {
+        $id = isset($arguments['id']) ? trim((string)$arguments['id']) : '';
+        $uuid = isset($arguments['uuid']) ? trim((string)$arguments['uuid']) : '';
+
+        if ($id === '' && $uuid === '') {
+            throw new \InvalidArgumentException('Provide either id or uuid.');
+        }
+
+        $request = $id !== ''
+            ? $this->storage->find($id)
+            : $this->storage->findByUuid($uuid);
+
+        if (!$request) {
+            throw new \InvalidArgumentException('Clockwork request not found.');
+        }
+
+        return $request;
+    }
+
+    private function getEventDetailsPayload(array $arguments)
+    {
+        $this->requireStorage();
+
+        $request = $this->requireRequest($arguments);
+
+        return [
+            'storage' => $this->storageMeta,
+            'request' => $request->toEventDetails()
         ];
     }
 
@@ -557,82 +633,6 @@ class ClockworkMcpServer
             ],
             'isError' => true
         ];
-    }
-
-    private function readMessage()
-    {
-        $headers = [];
-
-        while (($line = fgets($this->stdin)) !== false) {
-            $line = rtrim($line, "\r\n");
-
-            if ($line === '') break;
-
-            $parts = explode(':', $line, 2);
-
-            if (count($parts) !== 2) continue;
-
-            $headers[strtolower(trim($parts[0]))] = trim($parts[1]);
-        }
-
-        if (! count($headers)) return null;
-
-        if (! isset($headers['content-length'])) {
-            throw new \RuntimeException('Missing Content-Length header.');
-        }
-
-        $length = (int) $headers['content-length'];
-        $body = '';
-
-        while (strlen($body) < $length) {
-            $chunk = fread($this->stdin, $length - strlen($body));
-
-            if ($chunk === false || $chunk === '') break;
-
-            $body .= $chunk;
-        }
-
-        return $body;
-    }
-
-    private function respond($id, $result)
-    {
-        $this->writeMessage([
-            'jsonrpc' => '2.0',
-            'id' => $id,
-            'result' => $result
-        ]);
-    }
-
-    private function respondError($id, $code, $message, $data = null)
-    {
-        $error = [
-            'code' => $code,
-            'message' => $message
-        ];
-
-        if ($data !== null) $error['data'] = $data;
-
-        $this->writeMessage([
-            'jsonrpc' => '2.0',
-            'id' => $id,
-            'error' => $error
-        ]);
-    }
-
-    private function writeMessage(array $message)
-    {
-        $json = json_encode($message, JSON_UNESCAPED_SLASHES);
-
-        if ($json === false) {
-            fwrite($this->stderr, "Failed to encode MCP response.\n");
-            return;
-        }
-
-        $payload = "Content-Length: " . strlen($json) . "\r\n\r\n" . $json;
-
-        fwrite($this->stdout, $payload);
-        fflush($this->stdout);
     }
 }
 

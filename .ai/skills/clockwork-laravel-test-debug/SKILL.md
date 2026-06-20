@@ -13,13 +13,15 @@ Use the Clockwork Laravel endpoints as the first read path for test-environment 
 2. Pick the most relevant failure by `type`, `status`, `title`, `rootMessage`, and `topAppFrame`.
 3. Fetch `GET /__clockwork/events/details/{uuid}` for the chosen failure.
 4. Read `summary`, `primaryError`, and `topAppFrames` before scanning `raw`.
-5. Fetch `GET /__clockwork/env` when the failure may depend on environment, storage driver, queue mode, or collection settings.
+5. Fetch `GET /__clockwork/env` when the failure may depend on environment, storage driver, queue mode, or collection
+   settings.
 
 ## Endpoint Contract
 
 Use `GET /__clockwork/failures` for a recent failure list.
 
 Supported query parameters:
+
 - `limit`
 - `type`
 - `status`
@@ -29,6 +31,7 @@ Supported query parameters:
 Use `GET /__clockwork/events/details/{uuid}` for the full debugging payload for one event.
 
 Prioritize these fields:
+
 - `summary`
 - `primaryError`
 - `topAppFrames`
@@ -41,6 +44,7 @@ Prioritize these fields:
 Use `GET /__clockwork/env` for the Laravel test-environment snapshot.
 
 Prioritize these fields:
+
 - `appEnv`
 - `appDebug`
 - `phpVersion`
@@ -59,6 +63,7 @@ Treat these endpoints as read-only evidence sources. Do not infer missing busine
 
 Use `X-Clockwork-Auth` when authentication is enabled.
 
-When a failure has no obvious stack frame, inspect `context.log`, `externalAccess.http`, `externalAccess.database`, and `response` before reading `raw`.
+When a failure has no obvious stack frame, inspect `context.log`, `externalAccess.http`, `externalAccess.database`, and
+`response` before reading `raw`.
 
 When multiple failures look similar, group them by `summary.title`, `summary.rootMessage`, and the first `topAppFrame`.

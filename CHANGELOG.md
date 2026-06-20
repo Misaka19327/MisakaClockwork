@@ -4,7 +4,8 @@
 - Added Xdebug support to vanilla integration (reported by edxeth, thanks!)
 - improved collecting of Eloquent queries to better support escaped and named bindings (reported by DeBug88, thanks!)
 - fixed crash when no response is returned when collecting Guzzle HTTP requests (implemented by N1ebieski, thanks!)
-- fixed calling Artisan command inside Artisan command leading to multiple invalid requests being collected (reported by mattvb91, thanks!)
+- fixed calling Artisan command inside Artisan command leading to multiple invalid requests being collected (reported by
+  mattvb91, thanks!)
 - fixed duplicate N+1 queries being collected when running on Laravel Octane (implemented by yahya09, thanks!)
 
 5.3.4
@@ -20,7 +21,8 @@
 
 5.3.2
 
-- fixed crash collecting Laravel on-demand notifications with database or broadcast channels (reported by michaelthedev, thanks!) 
+- fixed crash collecting Laravel on-demand notifications with database or broadcast channels (reported by michaelthedev,
+  thanks!)
 
 5.3.1
 
@@ -35,14 +37,20 @@
 - added support for Doctrine 3+ (idea by DominicDetta, thanks!)
 - added support for Monolog 3 (implemented by Fedorov.Sergey, thanks!)
 - improved collecting database queries in Laravel to include transaction queries (implemented by congnv0330, thanks!)
-- improved collecting notifications in Laravel to include "To" field for database and broadcast notifications and improved email recipient formatting
-- improved Vanilla integration to support serving the Web UI without copying the assets (implemented by UlrichEckhardt, thanks!)
-- improved Request apis to automatically compute number of database queries, cache queries and model actions (idea by MarkusJLechner, thanks!)
+- improved collecting notifications in Laravel to include "To" field for database and broadcast notifications and
+  improved email recipient formatting
+- improved Vanilla integration to support serving the Web UI without copying the assets (implemented by UlrichEckhardt,
+  thanks!)
+- improved Request apis to automatically compute number of database queries, cache queries and model actions (idea by
+  MarkusJLechner, thanks!)
 - improved Artisan clockwork:clean to include clockwork:clear alias (implemented by wilsenhc, thanks!)
-- improved Vanilla integration config to use getenv() instead of $_ENV (implemented by UlrichEckhardt and Fedorov.Sergey, thanks!)
+- improved Vanilla integration config to use getenv() instead of $_ENV (implemented by UlrichEckhardt and
+  Fedorov.Sergey, thanks!)
 - improved Symfony integration to disable profiler for Clockwork Web UI requests
-- improved Monolog data source to automatically use correct handler (implemented by DominicDetta and Fedorov.Sergey, thanks!)
-- improved Laravel and Vanilla integration to clean up the x-clockwork cookie when it's no longer needed (idea by ssnepenthe, thanks!)
+- improved Monolog data source to automatically use correct handler (implemented by DominicDetta and Fedorov.Sergey,
+  thanks!)
+- improved Laravel and Vanilla integration to clean up the x-clockwork cookie when it's no longer needed (idea by
+  ssnepenthe, thanks!)
 - improved collecting models in Laravel to avoid crash when model's primary key is not set to string
 - changed file_exists call to is_dir/is_file (idea by staabm, thanks!)
 - fixed PHP 8.4 deprecation notices (reported by gharlan, thanks!)
@@ -58,7 +66,8 @@
 
 5.2.1
 
-- fixed collecting Laravel database notifications using toDatabase and broadcast notifications using toArray (implemented by ryzr, thanks!)
+- fixed collecting Laravel database notifications using toDatabase and broadcast notifications using toArray (
+  implemented by ryzr, thanks!)
 - fixed serialization of incomplete PHP classes (implemented by hamedghaderi, thanks!)
 
 5.2
@@ -67,27 +76,34 @@
 - added Redis storage implementation (implemented by christopherh0rn, thanks!)
 - added support for collecting tests with Pest 2 and PHPUnit 10 (reported by CadenP, idea by kdevan, thanks!)
 - added support for all Twig versions in the Twig profiler integration (idea by ericktucto, thanks!)
-- improved collecting of notifications in Laravel to support latest version of laravel/slack-notification-channel (implemented by maximepvrt, thanks!)
+- improved collecting of notifications in Laravel to support latest version of laravel/slack-notification-channel (
+  implemented by maximepvrt, thanks!)
 - improved Laravel installation process to be able to use "clockwork" tag for publishing the config file
 - improved default Laravel config to ignore Telescope Toolbar requests by default (implemented by lloricode, thanks!)
 - improved Eloquent data source to support Crate PDO (implemented by JulianMar, thanks!)
-- improved Slim integration to support retrieving latest requests in the rest api (implemented by UlrichEckhardt, thanks!)
+- improved Slim integration to support retrieving latest requests in the rest api (implemented by UlrichEckhardt,
+  thanks!)
 - fixed compatibility with Laravel <5.5 when collecting database queries (reported by sbahr001, thanks!)
 - fixed compatibility with Laravel 5.6 when client-metrics or toolbar is enabled (reported by Smolinsky, thanks!)
-- fixed checking of notification type when collecting Laravel notifications (reported by faraweilyas, idea by jameshulse, thanks!)
+- fixed checking of notification type when collecting Laravel notifications (reported by faraweilyas, idea by
+  jameshulse, thanks!)
 - fixed collecting of Slack notifications content in Laravel (implemented by maximepvrt, thanks!)
 - fixed collecting of Laravel cache expiration times (implemented by FeBe95, thanks!)
 - fixed ability to use custom should-collect and should-record callbacks (implemented by thattomperson, thanks!)
-- fixed a possible crash with SQL storage when creating backup table or inserting duplicate ids (reported by davidp-celtra, thanks!)
-- fixed an exception being thrown when Clockwork metadata path is not writable even when Clockwork was disabled (reported by joelharkes, thanks!)
-- fixed an issue with file storage causing some non-http requests might not be shown in the app (reported by mattvb91, thanks!)
+- fixed a possible crash with SQL storage when creating backup table or inserting duplicate ids (reported by
+  davidp-celtra, thanks!)
+- fixed an exception being thrown when Clockwork metadata path is not writable even when Clockwork was disabled (
+  reported by joelharkes, thanks!)
+- fixed an issue with file storage causing some non-http requests might not be shown in the app (reported by mattvb91,
+  thanks!)
 - fixed compatibility with using Filebeat to collect Clockwork metadata (implemented by JConseil, thanks!)
 - fixed Request::addModelAction method not storing the action properly (reported by UlrichEckhardt, thanks!)
 
 *BREAKING*
 
-- Running Clockwork is now restricted to local domains - localhost, local, test, wip and 127.0.0.1 - unless explicitly enabled.
-  If you want to use Clockwork on a different domain, please explicitly enable it by setting CLOCKWORK_ENABLE to true. 
+- Running Clockwork is now restricted to local domains - localhost, local, test, wip and 127.0.0.1 - unless explicitly
+  enabled.
+  If you want to use Clockwork on a different domain, please explicitly enable it by setting CLOCKWORK_ENABLE to true.
 
 5.1.12
 
@@ -97,7 +113,8 @@
 
 5.1.11
 
-- fixed crash when resolving authenticated user in Laravel without using Eloquent (reported by m-thalmann-athesia, thanks!)
+- fixed crash when resolving authenticated user in Laravel without using Eloquent (reported by m-thalmann-athesia,
+  thanks!)
 
 5.1.10
 
@@ -111,13 +128,15 @@
 
 - updated list of built-in Laravel commands to ignore when collecting commands and included Horizon commands
 - fixed collecting of Laravel queue jobs when used with Horizon
-- fixed collecting of authanticated user name when the User model includes name() method (implemented by devfrey, thanks!)
+- fixed collecting of authanticated user name when the User model includes name() method (implemented by devfrey,
+  thanks!)
 
 5.1.7
 
 - added support for authentiaction in the Vanilla integration
 - added support for compressed Xdebug profiles
-- improved collecting of Laravel Artisan commands to support abbreviated commands (implemented by mike-peters90, thanks!)
+- improved collecting of Laravel Artisan commands to support abbreviated commands (implemented by mike-peters90,
+  thanks!)
 - fixed doubled backslashes in collected Laravel database query bindings (reported by pys1992, thanks!)
 - fixed compatibility with PostgreSQL in SQL storage (implemented by screw, thanks!)
 - fixed possible crash during file storage cleanup when used with Laravel Octane (reported by flexchar, thanks!)
@@ -163,13 +182,16 @@
 - added support for psr/log 2.0 (used in recent Laravel versions) (implemented by byGits, thanks!)
 - improved timeline api event run method to return the return value of passed closure
 - improved collecting Laravel database queries to not quote integers (implemented by thisiskj, thanks!)
-- improved toolbar details link to always be absolute and work with subdirectories (reported by superDuperCyberTechno, thanks!)
+- improved toolbar details link to always be absolute and work with subdirectories (reported by superDuperCyberTechno,
+  thanks!)
 - fixed some deprecation warnings on PHP 8.1 (implemented by gharlan, thanks!)
-- fixed collecting Laravel database queries to produce correct queries when bindings contain question marks (reported by woshixiaobai, thanks!)
+- fixed collecting Laravel database queries to produce correct queries when bindings contain question marks (reported by
+  woshixiaobai, thanks!)
 - fixed filtering collected and recorded requests by closure (implemented by ssnepenthe, thanks!)
 - fixed some inconsistencies in the Clockwork metadata api
 - fixed some web UI assets being server with wrong mime-types (implemented by ssnepenthe, thanks!)
-- fixed missing method on storage interface and missing default parameter value in sql storage (implemented by ssnepenthe, thanks!)
+- fixed missing method on storage interface and missing default parameter value in sql storage (implemented by
+  ssnepenthe, thanks!)
 
 *BREAKING*
 
@@ -193,8 +215,10 @@
 
 - fixed crash when collecting Laravel mailables built via MailMessage (implemented by cbl, thanks!)
 - fixed crash when collecting artisan command in Lumen (reported by 2Attack, thanks!)
-- fixed crash when collecting database queries in Laravel with connection implementation not using PDO (implemented by lenssoft, thanks!)
-- fixed crash when HTTP request body contains valid json which does not contain array (eg. a number) (reported by Mradxz, thanks!)
+- fixed crash when collecting database queries in Laravel with connection implementation not using PDO (implemented by
+  lenssoft, thanks!)
+- fixed crash when HTTP request body contains valid json which does not contain array (eg. a number) (reported by
+  Mradxz, thanks!)
 - fixed collected jobs dispatched from other jobs not having a correct parent job set (implemented by josvar, thanks!)
 
 5.0.7
@@ -219,7 +243,8 @@
 - improved PSR-7 support in the vanilla integration
 - fixed toolbar might not work when not collecting database models
 - fixed crash collecting Slack and Nexmo notifications (reported by abalozz, thanks!)
-- fixed timeline api usage not being updated in the Slim integration leading to crash (reported by jiaojie1989, implemented by seanhamlin, thanks!)
+- fixed timeline api usage not being updated in the Slim integration leading to crash (reported by jiaojie1989,
+  implemented by seanhamlin, thanks!)
 - fixed api path being interpreted as regex in the vanilla integration (implemented by pqr, thanks!)
 - fixed Symfony storage not being updated for latest storage api (implemented by auchanhub, thanks!)
 
@@ -235,7 +260,8 @@
 5.0.2
 
 - fixed data sources not being initialized for extended data requests (reported by tmishutin, thanks!)
-- fixed inconsistent handling of time and duration arguments in various Request::add* methods (reported by mahagr, thanks!)
+- fixed inconsistent handling of time and duration arguments in various Request::add* methods (reported by mahagr,
+  thanks!)
 - updated Clockwork App (5.0.2)
 
 5.0.1
@@ -301,7 +327,8 @@
 
 4.1.6
 
-- added support for filtering collected requests by method to Laravel integration (options requests filtered by default) (idea by mortenscheel, thanks!)
+- added support for filtering collected requests by method to Laravel integration (options requests filtered by
+  default) (idea by mortenscheel, thanks!)
 - added support for filtering collected requests by uri and method to vanilla integration
 - fixed handling of failed file operations on index file in file storage (reported by staabm, thanks!)
 
@@ -312,7 +339,8 @@
 4.1.4
 
 - added support for a time property to the Request:add* apis, defaults to "current time - duration"
-- fixed crash when collecting console commands with array arguments or options in the Laravel integration (implemented by mortenscheel, thanks!)
+- fixed crash when collecting console commands with array arguments or options in the Laravel integration (implemented
+  by mortenscheel, thanks!)
 - fixed default storage directory being one level too deep in vanilla integration
 
 4.1.3
@@ -327,17 +355,22 @@
 4.1.1
 
 - added ext-json to composer.json require section (idea by staabm, thanks!)
-- fixed Clockwork being initialized too soon in Laravel integration leading to possible crashes (reported by tminich, thanks!)
+- fixed Clockwork being initialized too soon in Laravel integration leading to possible crashes (reported by tminich,
+  thanks!)
 
 4.1
 
-- added support for command type requests with command specific metadata (commandName, commandArguments, commandArgumentsDefaults, commandOptions, commandOptionsDefaults, commandExitCode, commandOutput)
+- added support for command type requests with command specific metadata (commandName, commandArguments,
+  commandArgumentsDefaults, commandOptions, commandOptionsDefaults, commandExitCode, commandOutput)
 - added support for collecting executed artisan commands in Laravel integration
-- added support for queue-job type requests with queue-job specific metadata (jobName, jobDescription, jobStatus, jobPayload, jobQueue, jobConnection, jobOptions)
+- added support for queue-job type requests with queue-job specific metadata (jobName, jobDescription, jobStatus,
+  jobPayload, jobQueue, jobConnection, jobOptions)
 - added support for collecting executed queue-jobs in Laravel integration (also supports Laravel Horizon)
-- added support for test type requests with test specific metadata (testName, testStatus, testStatusMessage, testAsserts)
+- added support for test type requests with test specific metadata (testName, testStatus, testStatusMessage,
+  testAsserts)
 - added support for collecting test runs in Laravel integration using PHPunit
-- added support for disabling collection of view data when collecting rendered views (new default is to collect views without data)
+- added support for disabling collection of view data when collecting rendered views (new default is to collect views
+  without data)
 - added Twig data source using the built-in Twig profiler to collect more precise Twig profiling data
 - added support for setting parent requests on requests
 - improved collecting of database queries, cache queries, dispatched queue jobs and redis commands to also collect time
@@ -349,7 +382,8 @@
 - improved Laravel events data source to include Laravel namespace in the default ignored events
 - improved Laravel views data source to strip view data prefixed with __
 - improved PHP data source to not set request time for cli commands
-- improved serializer to omit data below depth limit, support debugInfo, jsonSerialize and toArray methods (partially implemented by mahagr, thanks!)
+- improved serializer to omit data below depth limit, support debugInfo, jsonSerialize and toArray methods (partially
+  implemented by mahagr, thanks!)
 - improved log to allow overriding serializer settings via context, no longer enabled toString by default
 - improved Request class now has pre-populated request time on creation
 - improved StackTrace helper with limit option, last method, fixed filter output keys
@@ -373,7 +407,8 @@
 
 4.0.16
 
-- fixed Laravel middleware being registered too late, causing "collect data always" setting to not work (reported by Youniteus, thanks!)
+- fixed Laravel middleware being registered too late, causing "collect data always" setting to not work (reported by
+  Youniteus, thanks!)
 
 4.0.15
 
@@ -385,7 +420,8 @@
 
 4.0.13
 
-- fixed stack traces processing not handling call_user_func frames properly leading to wrong traces (reported by marcus-at-localhost, thanks!)
+- fixed stack traces processing not handling call_user_func frames properly leading to wrong traces (reported by
+  marcus-at-localhost, thanks!)
 - fixed wrong stack traces skip namespaces defaults leading to wrong traces
 - fixed vanilla integration config file missing and no longer used settings
 
@@ -405,8 +441,10 @@
 
 4.0.9
 
-- fixed duplicate queries detection reporting all relationship queries instead of only duplicates (reported by robclancy, thanks!)
-- improved the default .gitignore for metadata storage to ignore compressed metadata as well (implemented by clugg, thanks!)
+- fixed duplicate queries detection reporting all relationship queries instead of only duplicates (reported by
+  robclancy, thanks!)
+- improved the default .gitignore for metadata storage to ignore compressed metadata as well (implemented by clugg,
+  thanks!)
 
 4.0.8
 
@@ -418,14 +456,17 @@
 
 4.0.6
 
-- fixed possible crash in LaravelDataSource when resolving authenticated user in non-standard auth implementations (4.0 regression) (implemented by zarunet, thanks!)
+- fixed possible crash in LaravelDataSource when resolving authenticated user in non-standard auth implementations (4.0
+  regression) (implemented by zarunet, thanks!)
 - fixed StackTrace::filter calling array_filter with swapped arguments (implemented by villermen, thanks!)
-- fixed PHP 5.x incompatibility tenaming the Storage\Search empty and notEmpty methods to isEmpty and isNotEmpty (reported by eduardodgarciac, thanks!)
+- fixed PHP 5.x incompatibility tenaming the Storage\Search empty and notEmpty methods to isEmpty and isNotEmpty (
+  reported by eduardodgarciac, thanks!)
 - updated web UI (Clockwork App 4.0.3)
 
 4.0.5
 
-- fixed multiple issues causing FileStorage cleanup to not delete old metadata or crash (partially implemented by jaumesala, reported by SerafimArts, thanks!)
+- fixed multiple issues causing FileStorage cleanup to not delete old metadata or crash (partially implemented by
+  jaumesala, reported by SerafimArts, thanks!)
 - updated web UI (Clockwork App 4.0.2)
 
 4.0.4
@@ -469,7 +510,8 @@
 - improved refactored and cleaned up Laravel service provider
 - improved Lumen integration to share more code with Laravel integration
 - improved refactored sql storage a bit
-- improved timeline api, description is now optional and defaults to event name when calling startEvent (idea by robclancy, thanks!)
+- improved timeline api, description is now optional and defaults to event name when calling startEvent (idea by
+  robclancy, thanks!)
 - updated web UI
 - fixed regexp in vanilla integration Clockwork REST api processing
 - removed storage filter support (replaced by features configuration)
@@ -491,7 +533,8 @@
 3.1.1
 
 - exposed the Request::setAuthenticatedUser method on the main Clockwork class
-- fixed possible crash in LaravelDataSource when resolving authenticated user in non-standard auth implementations (thanks freshleafmedia, motia)
+- fixed possible crash in LaravelDataSource when resolving authenticated user in non-standard auth implementations (
+  thanks freshleafmedia, motia)
 
 3.1
 
@@ -529,7 +572,8 @@
 - added collecting of peak memory usage
 - added ability to use dark theme for the web UI
 - added new extend-api to data soruces for extending data when it's being sent to the application
-- improved data serialization implementation - handles recursion, unlimited depth, type metadata, clear marking for protected and private properties
+- improved data serialization implementation - handles recursion, unlimited depth, type metadata, clear marking for
+  protected and private properties
 - improved data serialization with configurable defaults, limit and blackboxing of classes
 - improved handling of binary bindings in EloquentDataSource (thanks sergio91pt and coderNeos)
 - improved stack traces collection to resolve original view names
@@ -583,7 +627,8 @@
 
 - updated Web UI to match Clockwork Chrome 2.1
 - improved Laravel support to load the default config and use env variables in the default config
-- improved Lumen support to use the standard config subsystem instead of directly accessing env variables (thanks davoaust, SunMar)
+- improved Lumen support to use the standard config subsystem instead of directly accessing env variables (thanks
+  davoaust, SunMar)
 - improved reliability of storing metadata in some cases (by using JSON_PARTIAL_OUTPUT_ON_ERROR when supported)
 - fixed wrong mime-type for javascript assets in Web UI causing it to not work in some browsers (thanks sleavitt)
 - fixed path checking in Web UI causing it to not work on Windows (thanks Malezha)
@@ -632,7 +677,8 @@ UPGRADING
 - PHP 5.3 - no longer supported, you can continue using the latest 1.x version
 - CodeIgniter - no longer supported, you can continue using the latest 1.x version
 - Slim 2 - update the imported namespace from Clockwork\Support\Slim to Clockwork\Support\Slim\Legacy
-- ability to register additional data sources via Clockwork config was removed, please call app('clockwork')->addDataSource(...) in your own service provider
+- ability to register additional data sources via Clockwork config was removed, please call app('clockwork')->
+  addDataSource(...) in your own service provider
 
 1.14.5
 
@@ -645,7 +691,8 @@ UPGRADING
 1.14.3
 
 - added support for Laravel 5.5 package auto-discovery (thanks Omranic)
-- added automatic registration of the Laravel middleware (no need to edit your Http/Kernel.php anymore, existing installations don't need to be changed)
+- added automatic registration of the Laravel middleware (no need to edit your Http/Kernel.php anymore, existing
+  installations don't need to be changed)
 - updated Laravel artisan clockwork:clean command for Laravel 5.5 (thanks rosswilson252)
 - fixed crash when retrieving all requests from Sql storage (thanks pies)
 
@@ -654,9 +701,11 @@ UPGRADING
 - fixed missing imports in Doctrine data source (thanks jenssegers)
 
 1.14.1
+
 - fixed collecting Eloquent queries when using PDO_ODBC driver for real (thanks abhimanyu003)
 
 1.14
+
 - added support for Server-Timing headers (thanks Garbee)
 - fixed compatibility with Lumen 5.4 (thanks Dimasdanz)
 - fixed collecting Eloquent queries with bindings containing backslashes (thanks fitztrev)
@@ -666,60 +715,76 @@ UPGRADING
 - fixed PHP 5.3 compatibility
 
 1.13.1
+
 - fixed compatibility with Lumen 5.4 (thanks meanevo)
 
 1.13
+
 - added support for Laravel 5.4 (thanks KKSzymanowski)
-- improved Laravel "clock" helper function now takes multiple arguments to be logged at once (eg. `clock($foo, $bar, $baz)`)
+- improved Laravel "clock" helper function now takes multiple arguments to be logged at once (eg.
+  `clock($foo, $bar, $baz)`)
 
 1.12
-- added collecting of caller file name and line number for queries and model name (Laravel 4.2+) for ORM queries to the Eloquent data source (thanks OmarMakled and fitztrev for the idea)
+
+- added collecting of caller file name and line number for queries and model name (Laravel 4.2+) for ORM queries to the
+  Eloquent data source (thanks OmarMakled and fitztrev for the idea)
 - added collecting of context, caller file name and line number to the logger (thanks crissi for the idea)
 - fixed crash in Lumen data source when running unit tests with simulated requests on Lumen
 - fixed compatibility with Laravel 4.0
 
 1.11.2
+
 - switched to PSR-4 autoloading
 - fixed Swift data source crash when sending email with no from/to address specified (thanks marksecurelogin)
 
 1.11.1
+
 - added support for DateTimeImmutable in Doctrine data source (thanks morfin)
 - fixed not being able to log null values via the "clock" helper function
 - fixed Laravel 4.2-dev not being properly detected as 4.2 release (thanks DemianD)
 
 1.11
+
 - added support for Lumen 5.2 (thanks lukeed)
 - added "clock" helper function
 - fixed data sources being initialized too late (thanks morfin)
 - fixed code style in Doctrine data source
 - removed Laravel log dependency from Doctrine data source
-- NOTE laravel-doctrine provides ootb support for Clockwork, you should use this instead of included Doctrine data source with Laravel
+- NOTE laravel-doctrine provides ootb support for Clockwork, you should use this instead of included Doctrine data
+  source with Laravel
 
 1.10.1
+
 - fixed collecting of database queries in Laravel 5.2 (thanks sebastiandedeyne)
 
 1.10
+
 - added Laravel 5.2 support (thanks jonphipps)
 - improved file storage to allow configuring directory permissions (thanks patrick-radius)
 - fixed interaction with PHPUnit in Lumen (thanks troyharvey)
 - removed "router dispatch" timeline event for now (due to Laravel 5.2 changes)
 
 1.9
+
 - added Lumen support (thanks dawiyo)
 - added aliases for all Clockwork parts so they can be resolved by the IoC container in Laravel and Lumen
-- fixed Laravel framework initialisation, booting and running timeline events not being recorded properly (thanks HipsterJazzbo, sisve)
+- fixed Laravel framework initialisation, booting and running timeline events not being recorded properly (thanks
+  HipsterJazzbo, sisve)
 - fixed how Laravel clockwork:clean artisan command is registered (thanks freekmurze)
 - removed Lumen framework initialisation, booting and running timeline events as they are not supported by Lumen
 
 1.8.1
+
 - fixed SQL data storage initialization if PDO is set to throw exception on error (thanks YOzaz)
 
 1.8
+
 - added SQL data storage implementation
 - added new config options for data storage for Laravel (please re-publish the config file)
 - fixed not being able to use the Larvel route caching when using Clockwork (thanks Garbee, kylestev, cbakker86)
 
 1.7
+
 - added support for Laravel 5 (thanks Garbee, slovenianGooner)
 - improved support for Laravel 4.1 and 4.2, Clockwork data is now available for error responses
 - added Doctrine data source (thanks matiux)
@@ -727,6 +792,7 @@ UPGRADING
 - updated Laravel data source to capture the context for log messages (thanks hermanzhu)
 
 1.6
+
 - improved Eloquent data source to support multiple databases (thanks ingro)
 - improved compatibility with Laravel apps not using database
 - improved compatibility with various CodeIngiter installations
@@ -735,6 +801,7 @@ UPGRADING
 - changed Timeline::endEvent behavior to return false instead of throwing exception when called for non-existing event
 
 1.5
+
 - improved Slim support to use DI container to share Clockwork instance instead of config
 - improved Slim support now adds all messages logged via Slim's log interface to Clockwork log as well
 - improved CodeIgniter support to make Clockwork available through the CI app (tnx BradEstey)
@@ -743,35 +810,46 @@ UPGRADING
 - fixed file storage warning when recursive data is collected
 
 1.4.4
+
 - changed Laravel support to disable permanent data collection by default (tnx jenssegers)
 - improved Laravel support to return Clockwork data with proper Content-Type (tnx maximebeaudoin)
 - fixed CodeIgniter support compatibility with PHP 5.3 (tnx BradEstey)
 
 1.4.3
+
 - fixed incorrect requests ids being generated depending on set locale
 
 1.4.2
+
 - fixed Laravel support compatibility with PHP 5.3
 
 1.4.1
+
 - fixed Laravel support compatibility with PHP 5.3
 
 1.4
+
 - added support for collecting emails and views data
 - added support for CodeIgniter 2.1 (tnx pwhelan)
 - added data source and plugin for collecting emails data from Swift mailer
 - added support for collecting emails and views data from Laravel
-- added --age argument to Laravel artisan clockwork::clean command, specifies how old the request data must be to be deleted (in hours)
+- added --age argument to Laravel artisan clockwork::clean command, specifies how old the request data must be to be
+  deleted (in hours)
 - improved Laravel service provider
 - fixed compatibility with latest Laravel 4.1
 
 1.3
-NOTE: Clockwork\Request\Log::log method arguments have been changed from log($message, $level) to log($level, $message), levels are now specified via Psr\Log\LogLevel class, it's recommended to use shortcut methods for various levels (emergency, alert, critical,  error, warning, notice, info and debug($message))
-- clockwork log class now implements PSR logger interface, updated Laravel and Monolog support to use all available log levels
+NOTE: Clockwork\Request\Log::log method arguments have been changed from log($message, $level) to log($level, $message),
+levels are now specified via Psr\Log\LogLevel class, it's recommended to use shortcut methods for various levels (
+emergency, alert, critical, error, warning, notice, info and debug($message))
+
+- clockwork log class now implements PSR logger interface, updated Laravel and Monolog support to use all available log
+  levels
 - clockwork log now accepts objects and arrays as input and logs their json representation
 - added support for specifying additional headers on metadata requests (Laravel) (tnx philsturgeon)
 
 1.2
+
 - added support for Laravel 4.1
 - added facade for Laravel
 - added ability to disable collecting data about requests to specified URIs in Laravel
@@ -783,6 +861,7 @@ NOTE: Clockwork\Request\Log::log method arguments have been changed from log($me
 - fixed a few bugs that could lead to PHP errors/exceptions
 
 1.1
+
 - added support for Laravel 4 apps running in subdirs (requires Clockwork Chrome 1.1+)
 - added data-protocol version to the request data
 - updated Laravel 4 service provider to work with Clockwork Web
@@ -791,6 +870,7 @@ NOTE: Clockwork\Request\Log::log method arguments have been changed from log($me
 - fixed a bug where using certain filters would store incorrect data
 
 0.9.1
+
 - added support for application routes (ootb support for Laravel 4 only atm)
 - added configuration file for Laravel 4
 - added support for filtering stored data in Storage

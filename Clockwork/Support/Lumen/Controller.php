@@ -1,8 +1,6 @@
 <?php namespace Clockwork\Support\Lumen;
 
 use Clockwork\Clockwork;
-use Clockwork\Support\Lumen\ClockworkSupport;
-
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Laravel\Lumen\Routing\Controller as LumenController;
 use Laravel\Telescope\Telescope;
@@ -10,93 +8,101 @@ use Laravel\Telescope\Telescope;
 // Clockwork api and app controller
 class Controller extends LumenController
 {
-	// Clockwork and support instances
-	public $clockwork;
-	public $clockworkSupport;
+    // Clockwork and support instances
+    public $clockwork;
+    public $clockworkSupport;
 
-	public function __construct(Clockwork $clockwork, ClockworkSupport $clockworkSupport)
-	{
-		$this->clockwork = $clockwork;
-		$this->clockworkSupport = $clockworkSupport;
-	}
+    public function __construct(Clockwork $clockwork, ClockworkSupport $clockworkSupport)
+    {
+        $this->clockwork = $clockwork;
+        $this->clockworkSupport = $clockworkSupport;
+    }
 
-	// Authantication endpoint
-	public function authenticate(Request $request)
-	{
-		$this->ensureClockworkIsEnabled();
+    // Authantication endpoint
+    public function authenticate(Request $request)
+    {
+        $this->ensureClockworkIsEnabled();
 
-		$token = $this->clockwork->authenticator()->attempt(
-			$request->only([ 'username', 'password' ])
-		);
+        $token = $this->clockwork->authenticator()->attempt(
+            $request->only(['username', 'password'])
+        );
 
-		return new JsonResponse([ 'token' => $token ], $token ? 200 : 403);
-	}
+        return new JsonResponse(['token' => $token], $token ? 200 : 403);
+    }
 
-	// Metadata retrieving endpoint
-	public function getData(Request $request, $id = null, $direction = null, $count = null)
-	{
-		$this->ensureClockworkIsEnabled();
+    // Metadata retrieving endpoint
 
-		return $this->clockworkSupport->getData(
-			$id, $direction, $count, $request->only([ 'only', 'except' ])
-		);
-	}
+    protected function ensureClockworkIsEnabled()
+    {
+        if (class_exists(Telescope::class)) Telescope::stopRecording();
 
-	// Extended metadata retrieving endpoint
-	public function getExtendedData(Request $request, $id = null)
-	{
-		$this->ensureClockworkIsEnabled();
+        if (!$this->clockworkSupport->isEnabled()) abort(404);
+    }
 
-		return $this->clockworkSupport->getExtendedData(
-			$id, $request->only([ 'only', 'except' ])
-		);
-	}
+    // Extended metadata retrieving endpoint
 
-	// Event details retrieving endpoint
-	public function getEventDetails($uuid)
-	{
-		$this->ensureClockworkIsEnabled();
+    public function getData(Request $request, $id = null, $direction = null, $count = null)
+    {
+        $this->ensureClockworkIsEnabled();
 
-		return $this->clockworkSupport->getEventDetailsByUuid($uuid);
-	}
+        return $this->clockworkSupport->getData(
+            $id, $direction, $count, $request->only(['only', 'except'])
+        );
+    }
 
-	// Metadata updating endpoint
-	public function updateData(Request $request, $id = null)
-	{
-		$this->ensureClockworkIsEnabled();
+    // Event details retrieving endpoint
 
-		return $this->clockworkSupport->updateData($id, $request->json()->all());
-	}
+    public function getExtendedData(Request $request, $id = null)
+    {
+        $this->ensureClockworkIsEnabled();
 
-	// App index
-	public function webIndex(Request $request)
-	{
-		$this->ensureClockworkIsEnabled();
+        return $this->clockworkSupport->getExtendedData(
+            $id, $request->only(['only', 'except'])
+        );
+    }
 
-		return $this->clockworkSupport->getWebAsset('index.html');
-	}
+    // Metadata updating endpoint
 
-	// App assets serving
-	public function webAsset($path)
-	{
-		$this->ensureClockworkIsEnabled();
+    public function getEventDetails($uuid)
+    {
+        $this->ensureClockworkIsEnabled();
 
-		return $this->clockworkSupport->getWebAsset($path);
-	}
+        return $this->clockworkSupport->getEventDetailsByUuid($uuid);
+    }
 
-	// App redirect (/clockwork -> /clockwork/app)
-	public function webRedirect(Request $request)
-	{
-		$this->ensureClockworkIsEnabled();
+    // App index
 
-		return new RedirectResponse('/' . $request->path() . '/app');
-	}
+    public function updateData(Request $request, $id = null)
+    {
+        $this->ensureClockworkIsEnabled();
 
-	// Ensure Clockwork is still enabled at this point and stop Telescope recording if present
-	protected function ensureClockworkIsEnabled()
-	{
-		if (class_exists(Telescope::class)) Telescope::stopRecording();
+        return $this->clockworkSupport->updateData($id, $request->json()->all());
+    }
 
-		if (! $this->clockworkSupport->isEnabled()) abort(404);
-	}
+    // App assets serving
+
+    public function webIndex(Request $request)
+    {
+        $this->ensureClockworkIsEnabled();
+
+        return $this->clockworkSupport->getWebAsset('index.html');
+    }
+
+    // App redirect (/clockwork -> /clockwork/app)
+
+    public function webAsset($path)
+    {
+        $this->ensureClockworkIsEnabled();
+
+        return $this->clockworkSupport->getWebAsset($path);
+    }
+
+    // Ensure Clockwork is still enabled at this point and stop Telescope recording if present
+
+    public function webRedirect(Request $request)
+    {
+        $this->ensureClockworkIsEnabled();
+
+        return new RedirectResponse('/' . $request->path() . '/app');
+    }
 }

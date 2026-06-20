@@ -7,34 +7,34 @@ use Doctrine\DBAL\Driver\Result;
 // Part of the Clockwork logging middleware, should not be used directly
 class Connection extends AbstractConnectionMiddleware
 {
-	protected $onQuery;
+    protected $onQuery;
 
-	public function __construct(ConnectionInterface $connection, $onQuery)
-	{
-		parent::__construct($connection);
+    public function __construct(ConnectionInterface $connection, $onQuery)
+    {
+        parent::__construct($connection);
 
-		$this->onQuery = $onQuery;
-	}
+        $this->onQuery = $onQuery;
+    }
 
-	public function query(string $sql): Result
-	{
-		$time = microtime(true);
+    public function query(string $sql): Result
+    {
+        $time = microtime(true);
 
-		$result = parent::query($sql);
+        $result = parent::query($sql);
 
-		($this->onQuery)([ 'query' => $sql, 'time' => $time ]);
+        ($this->onQuery)(['query' => $sql, 'time' => $time]);
 
-		return $result;
-	}
+        return $result;
+    }
 
-	public function exec(string $sql): int
-	{
-		$time = microtime(true);
+    public function exec(string $sql): int
+    {
+        $time = microtime(true);
 
-		$result = parent::exec($sql);
+        $result = parent::exec($sql);
 
-		($this->onQuery)([ 'query' => $sql, 'time' => $time ]);
+        ($this->onQuery)(['query' => $sql, 'time' => $time]);
 
-		return $result;
-	}
+        return $result;
+    }
 }

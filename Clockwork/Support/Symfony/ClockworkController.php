@@ -1,77 +1,76 @@
 <?php namespace Clockwork\Support\Symfony;
 
 use Clockwork\Clockwork;
-
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\{JsonResponse, Request};
 
 class ClockworkController extends AbstractController
 {
-	protected $clockwork;
-	protected $support;
+    protected $clockwork;
+    protected $support;
 
-	public function __construct(Clockwork $clockwork, ClockworkSupport $support)
-	{
-		$this->clockwork = $clockwork;
-		$this->support = $support;
-	}
+    public function __construct(Clockwork $clockwork, ClockworkSupport $support)
+    {
+        $this->clockwork = $clockwork;
+        $this->support = $support;
+    }
 
-	public function authenticate(Request $request)
-	{
-		$this->ensureClockworkIsEnabled();
+    public function authenticate(Request $request)
+    {
+        $this->ensureClockworkIsEnabled();
 
-		$token = $this->clockwork->authenticator()->attempt($request->request->all());
+        $token = $this->clockwork->authenticator()->attempt($request->request->all());
 
-		return new JsonResponse([ 'token' => $token ], $token ? 200 : 403);
-	}
+        return new JsonResponse(['token' => $token], $token ? 200 : 403);
+    }
 
-	public function getData(Request $request, $id = null, $direction = null, $count = null)
-	{
-		$this->ensureClockworkIsEnabled();
+    protected function ensureClockworkIsEnabled()
+    {
+        if (!$this->support->isEnabled()) throw $this->createNotFoundException();
+    }
 
-		return $this->support->getData($request, $id, $direction, $count);
-	}
+    public function getData(Request $request, $id = null, $direction = null, $count = null)
+    {
+        $this->ensureClockworkIsEnabled();
 
-	public function getEventDetails(Request $request, $uuid)
-	{
-		$this->ensureClockworkIsEnabled();
+        return $this->support->getData($request, $id, $direction, $count);
+    }
 
-		return $this->support->getEventDetailsByUuid($request, $uuid);
-	}
+    public function getEventDetails(Request $request, $uuid)
+    {
+        $this->ensureClockworkIsEnabled();
 
-	public function webIndex(Request $request)
-	{
-		$this->ensureClockworkIsEnabled();
-		$this->ensureClockworkWebIsEnabled();
+        return $this->support->getEventDetailsByUuid($request, $uuid);
+    }
 
-		return $this->support->getWebAsset('index.html');
-	}
+    public function webIndex(Request $request)
+    {
+        $this->ensureClockworkIsEnabled();
+        $this->ensureClockworkWebIsEnabled();
 
-	public function webAsset($path)
-	{
-		$this->ensureClockworkIsEnabled();
-		$this->ensureClockworkWebIsEnabled();
+        return $this->support->getWebAsset('index.html');
+    }
 
-		return $this->support->getWebAsset($path);
-	}
+    protected function ensureClockworkWebIsEnabled()
+    {
+        if (!$this->support->isWebEnabled()) throw $this->createNotFoundException();
+    }
 
-	public function webRedirect(Request $request)
-	{
-		$this->ensureClockworkIsEnabled();
-		$this->ensureClockworkWebIsEnabled();
+    public function webAsset($path)
+    {
+        $this->ensureClockworkIsEnabled();
+        $this->ensureClockworkWebIsEnabled();
 
-		$path = $this->support->webPaths()[0];
+        return $this->support->getWebAsset($path);
+    }
 
-		return $this->redirectToRoute("clockwork.webIndex.{$path}");
-	}
+    public function webRedirect(Request $request)
+    {
+        $this->ensureClockworkIsEnabled();
+        $this->ensureClockworkWebIsEnabled();
 
-	protected function ensureClockworkIsEnabled()
-	{
-		if (! $this->support->isEnabled()) throw $this->createNotFoundException();
-	}
+        $path = $this->support->webPaths()[0];
 
-	protected function ensureClockworkWebIsEnabled()
-	{
-		if (! $this->support->isWebEnabled()) throw $this->createNotFoundException();
-	}
+        return $this->redirectToRoute("clockwork.webIndex.{$path}");
+    }
 }

@@ -1,49 +1,48 @@
 <?php namespace Clockwork\Support\Symfony;
 
 use Clockwork\Clockwork;
-
-use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\Component\HttpKernel\Event\KernelEvent;
-use Symfony\Component\HttpKernel\Profiler\Profiler;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpKernel\Event\KernelEvent;
+use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\HttpKernel\Profiler\Profiler;
 
 class ClockworkListener implements EventSubscriberInterface
 {
-	protected $clockwork;
-	protected $profiler;
+    protected $clockwork;
+    protected $profiler;
 
-	public function __construct(ClockworkSupport $clockwork, Profiler $profiler)
-	{
-		$this->clockwork = $clockwork;
-		$this->profiler = $profiler;
-	}
+    public function __construct(ClockworkSupport $clockwork, Profiler $profiler)
+    {
+        $this->clockwork = $clockwork;
+        $this->profiler = $profiler;
+    }
 
-	public function onKernelRequest(KernelEvent $event)
-	{
-		$disabledPaths = array_merge([ '__clockwork' ], $this->clockwork->webPaths());
+    public static function getSubscribedEvents()
+    {
+        return [
+            KernelEvents::REQUEST => ['onKernelRequest', 512],
+            KernelEvents::RESPONSE => ['onKernelResponse', -128]
+        ];
+    }
 
-		foreach ($disabledPaths as $path) {
-			if (strpos($event->getRequest()->getPathInfo(), "/{$path}") !== false) $this->profiler->disable();
-		}
-	}
+    public function onKernelRequest(KernelEvent $event)
+    {
+        $disabledPaths = array_merge(['__clockwork'], $this->clockwork->webPaths());
 
-	public function onKernelResponse(KernelEvent $event)
-	{
-		if (! $this->clockwork->isEnabled()) return;
+        foreach ($disabledPaths as $path) {
+            if (strpos($event->getRequest()->getPathInfo(), "/{$path}") !== false) $this->profiler->disable();
+        }
+    }
 
-		$response = $event->getResponse();
+    public function onKernelResponse(KernelEvent $event)
+    {
+        if (!$this->clockwork->isEnabled()) return;
 
-		if (! $response->headers->has('X-Debug-Token')) return;
+        $response = $event->getResponse();
 
-		$response->headers->set('X-Clockwork-Id', $response->headers->get('X-Debug-Token'));
-		$response->headers->set('X-Clockwork-Version', Clockwork::VERSION);
-	}
+        if (!$response->headers->has('X-Debug-Token')) return;
 
-	public static function getSubscribedEvents()
-	{
-		return [
-			KernelEvents::REQUEST => [ 'onKernelRequest', 512 ],
-			KernelEvents::RESPONSE => [ 'onKernelResponse', -128 ]
-		];
-	}
+        $response->headers->set('X-Clockwork-Id', $response->headers->get('X-Debug-Token'));
+        $response->headers->set('X-Clockwork-Version', Clockwork::VERSION);
+    }
 }

@@ -5,41 +5,44 @@ use Clockwork\Request\Request;
 // Generates Server-Timing header value
 class ServerTiming
 {
-	// Performance metrics to include
-	protected $metrics = [];
+    // Performance metrics to include
+    protected $metrics = [];
 
-	// Add a performance metric
-	public function add($metric, $value, $description)
-	{
-		$this->metrics[] = [ 'metric' => $metric, 'value' => $value, 'description' => $description ];
+    // Add a performance metric
 
-		return $this;
-	}
+    public static function fromRequest(Request $request, $eventsCount = 10)
+    {
+        $header = new static;
 
-	// Generate the header value
-	public function value()
-	{
-		return implode(', ', array_map(function ($metric) {
-			return "{$metric['metric']}; dur={$metric['value']}; desc=\"{$metric['description']}\"";
-		}, $this->metrics));
-	}
+        $header->add('app', $request->getResponseDuration(), 'Application');
 
-	// Create a new instance from a Clockwork request
-	public static function fromRequest(Request $request, $eventsCount = 10)
-	{
-		$header = new static;
+        if ($request->getDatabaseDuration()) {
+            $header->add('db', $request->getDatabaseDuration(), 'Database');
+        }
 
-		$header->add('app', $request->getResponseDuration(), 'Application');
+        // add timeline events limited to a set number so the header doesn't get too large
+        foreach (array_slice($request->timeline()->events, 0, $eventsCount) as $i => $event) {
+            $header->add("timeline-event-{$i}", $event->duration(), $event->description);
+        }
 
-		if ($request->getDatabaseDuration()) {
-			$header->add('db', $request->getDatabaseDuration(), 'Database');
-		}
+        return $header;
+    }
 
-		// add timeline events limited to a set number so the header doesn't get too large
-		foreach (array_slice($request->timeline()->events, 0, $eventsCount) as $i => $event) {
-			$header->add("timeline-event-{$i}", $event->duration(), $event->description);
-		}
+    // Generate the header value
 
-		return $header;
-	}
+    public function add($metric, $value, $description)
+    {
+        $this->metrics[] = ['metric' => $metric, 'value' => $value, 'description' => $description];
+
+        return $this;
+    }
+
+    // Create a new instance from a Clockwork request
+
+    public function value()
+    {
+        return implode(', ', array_map(function ($metric) {
+            return "{$metric['metric']}; dur={$metric['value']}; desc=\"{$metric['description']}\"";
+        }, $this->metrics));
+    }
 }

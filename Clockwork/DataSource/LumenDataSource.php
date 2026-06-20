@@ -1,194 +1,204 @@
 <?php namespace Clockwork\DataSource;
 
-use Clockwork\DataSource\DataSource;
 use Clockwork\Helpers\Serializer;
 use Clockwork\Request\{Log, Request};
-
 use Laravel\Lumen\Application;
 use Symfony\Component\HttpFoundation\Response;
 
 // Data source for Lumen framework, provides application log, request and response information
 class LumenDataSource extends DataSource
 {
-	// Lumen application instance
-	protected $app;
+    // Lumen application instance
+    protected $app;
 
-	// Lumen response instance
-	protected $response;
+    // Lumen response instance
+    protected $response;
 
-	// Whether we should collect log messages
-	protected $collectLog = true;
+    // Whether we should collect log messages
+    protected $collectLog = true;
 
-	// Whether we should collect routes
-	protected $collectRoutes = false;
+    // Whether we should collect routes
+    protected $collectRoutes = false;
 
-	// Clockwork log instance
-	protected $log;
+    // Clockwork log instance
+    protected $log;
 
-	// Create a new data source, takes Lumen application instance and additional options as arguments
-	public function __construct(Application $app, $collectLog = true, $collectRoutes = false)
-	{
-		$this->app = $app;
+    // Create a new data source, takes Lumen application instance and additional options as arguments
+    public function __construct(Application $app, $collectLog = true, $collectRoutes = false)
+    {
+        $this->app = $app;
 
-		$this->collectLog    = $collectLog;
-		$this->collectRoutes = $collectRoutes;
+        $this->collectLog = $collectLog;
+        $this->collectRoutes = $collectRoutes;
 
-		$this->log = new Log;
-	}
+        $this->log = new Log;
+    }
 
-	// Adds request, response information, middleware, routes, session data, user and log entries to the request
-	public function resolve(Request $request)
-	{
-		$request->method         = $this->getRequestMethod();
-		$request->uri            = $this->getRequestUri();
-		$request->controller     = $this->getController();
-		$request->headers        = $this->getRequestHeaders();
-		$request->responseStatus = $this->getResponseStatus();
-		$request->routes         = $this->getRoutes();
-		$request->sessionData    = $this->getSessionData();
+    // Adds request, response information, middleware, routes, session data, user and log entries to the request
+    public function resolve(Request $request)
+    {
+        $request->method = $this->getRequestMethod();
+        $request->uri = $this->getRequestUri();
+        $request->controller = $this->getController();
+        $request->headers = $this->getRequestHeaders();
+        $request->responseStatus = $this->getResponseStatus();
+        $request->routes = $this->getRoutes();
+        $request->sessionData = $this->getSessionData();
 
-		$this->resolveAuthenticatedUser($request);
+        $this->resolveAuthenticatedUser($request);
 
-		$request->log()->merge($this->log);
+        $request->log()->merge($this->log);
 
-		return $request;
-	}
+        return $request;
+    }
 
-	// Reset the data source to an empty state, clearing any collected data
-	public function reset()
-	{
-		$this->log = new Log;
-	}
+    // Reset the data source to an empty state, clearing any collected data
 
-	// Set Lumen response instance for the current request
-	public function setResponse(Response $response)
-	{
-		$this->response = $response;
-		return $this;
-	}
+    protected function getRequestMethod()
+    {
+        if ($this->app->bound('request')) {
+            return $this->app['request']->getMethod();
+        } elseif (isset($_POST['_method'])) {
+            return strtoupper($_POST['_method']);
+        } else {
+            return $_SERVER['REQUEST_METHOD'];
+        }
+    }
 
-	// Listen for the log events
-	public function listenToEvents()
-	{
-		if (! $this->collectLog) return;
+    // Set Lumen response instance for the current request
 
-		if (class_exists(\Illuminate\Log\Events\MessageLogged::class)) {
-			// Lumen 5.4
-			$this->app['events']->listen(\Illuminate\Log\Events\MessageLogged::class, function ($event) {
-				$this->log->log($event->level, $event->message, $event->context);
-			});
-		} else {
-			// Lumen 5.0 to 5.3
-			$this->app['events']->listen('illuminate.log', function ($level, $message, $context) {
-				$this->log->log($level, $message, $context);
-			});
-		}
-	}
+    protected function getRequestUri()
+    {
+        return $this->app['request']->getRequestUri();
+    }
 
-	// Get a textual representation of current route's controller
-	protected function getController()
-	{
-		$routes = method_exists($this->app, 'getRoutes') ? $this->app->getRoutes() : [];
+    // Listen for the log events
 
-		$method = $this->getRequestMethod();
-		$pathInfo = $this->getPathInfo();
+    protected function getController()
+    {
+        $routes = method_exists($this->app, 'getRoutes') ? $this->app->getRoutes() : [];
 
-		$controller = $routes[$method.$pathInfo]['action']['uses'] ?? $routes[$method.$pathInfo]['action'][0] ?? null;
+        $method = $this->getRequestMethod();
+        $pathInfo = $this->getPathInfo();
 
-		if ($controller instanceof \Closure) {
-			$controller = 'anonymous function';
-		} elseif (is_object($controller)) {
-			$controller = 'instance of ' . get_class($controller);
-		} elseif (! is_string($controller)) {
-			$controller = null;
-		}
+        $controller = $routes[$method . $pathInfo]['action']['uses'] ?? $routes[$method . $pathInfo]['action'][0] ?? null;
 
-		return $controller;
-	}
+        if ($controller instanceof \Closure) {
+            $controller = 'anonymous function';
+        } elseif (is_object($controller)) {
+            $controller = 'instance of ' . get_class($controller);
+        } elseif (!is_string($controller)) {
+            $controller = null;
+        }
 
-	// Get the request headers
-	protected function getRequestHeaders()
-	{
-		return $this->app['request']->headers->all();
-	}
+        return $controller;
+    }
 
-	// Get the request method
-	protected function getRequestMethod()
-	{
-		if ($this->app->bound('request')) {
-			return $this->app['request']->getMethod();
-		} elseif (isset($_POST['_method'])) {
-			return strtoupper($_POST['_method']);
-		} else {
-			return $_SERVER['REQUEST_METHOD'];
-		}
-	}
+    // Get a textual representation of current route's controller
 
-	// Get the request URI
-	protected function getRequestUri()
-	{
-		return $this->app['request']->getRequestUri();
-	}
+    protected function getRoutes()
+    {
+        if (!$this->collectRoutes) return [];
 
-	// Get the response status code
-	protected function getResponseStatus()
-	{
-		return $this->response ? $this->response->getStatusCode() : null;
-	}
+        if (isset($this->app->router)) {
+            $routes = array_values($this->app->router->getRoutes());
+        } elseif (method_exists($this->app, 'getRoutes')) {
+            $routes = array_values($this->app->getRoutes());
+        } else {
+            $routes = [];
+        }
 
-	// Get an array of application routes
-	protected function getRoutes()
-	{
-		if (! $this->collectRoutes) return [];
+        return array_map(function ($route) {
+            return [
+                'method' => $route['method'],
+                'uri' => $route['uri'],
+                'name' => $route['action']['as'] ?? null,
+                'action' => is_string($route['action']['uses'] ?? null) ? $route['action']['uses'] : 'anonymous function',
+                'middleware' => $route['action']['middleware'] ?? null,
+            ];
+        }, $routes);
+    }
 
-		if (isset($this->app->router)) {
-			$routes = array_values($this->app->router->getRoutes());
-		} elseif (method_exists($this->app, 'getRoutes')) {
-			$routes = array_values($this->app->getRoutes());
-		} else {
-			$routes = [];
-		}
+    // Get the request headers
 
-		return array_map(function ($route) {
-			return [
-				'method' => $route['method'],
-				'uri'    => $route['uri'],
-				'name'   => $route['action']['as'] ?? null,
-				'action' => is_string($route['action']['uses'] ?? null) ? $route['action']['uses'] : 'anonymous function',
-				'middleware' => $route['action']['middleware'] ?? null,
-			];
-		}, $routes);
-	}
+    protected function getPathInfo()
+    {
+        if ($this->app->bound('request')) {
+            return $this->app['request']->getPathInfo();
+        } else {
+            $query = $_SERVER['QUERY_STRING'] ?? '';
+            return '/' . trim(str_replace("?{$query}", '', $_SERVER['REQUEST_URI']), '/');
+        }
+    }
 
-	// Get the session data (normalized with passwords removed)
-	protected function getSessionData()
-	{
-		if (! isset($this->app['session'])) return [];
+    // Get the request method
 
-		return $this->removePasswords((new Serializer)->normalizeEach($this->app['session']->all()));
-	}
+    protected function getRequestHeaders()
+    {
+        return $this->app['request']->headers->all();
+    }
 
-	// Add authenticated user data to the request
-	protected function resolveAuthenticatedUser(Request $request)
-	{
-		if (! isset($this->app['auth'])) return;
-		if (! ($user = $this->app['auth']->user())) return;
-		if (! isset($user->email) || ! isset($user->id)) return;
+    // Get the request URI
 
-		$request->setAuthenticatedUser($user->email, $user->id, [
-			'email' => $user->email,
-			'name'  => $user->name ?? null
-		]);
-	}
+    protected function getResponseStatus()
+    {
+        return $this->response ? $this->response->getStatusCode() : null;
+    }
 
-	// Get the request path info
-	protected function getPathInfo()
-	{
-		if ($this->app->bound('request')) {
-			return $this->app['request']->getPathInfo();
-		} else {
-			$query = $_SERVER['QUERY_STRING'] ?? '';
-			return '/' . trim(str_replace("?{$query}", '', $_SERVER['REQUEST_URI']), '/');
-		}
-	}
+    // Get the response status code
+
+    protected function getSessionData()
+    {
+        if (!isset($this->app['session'])) return [];
+
+        return $this->removePasswords((new Serializer)->normalizeEach($this->app['session']->all()));
+    }
+
+    // Get an array of application routes
+
+    protected function resolveAuthenticatedUser(Request $request)
+    {
+        if (!isset($this->app['auth'])) return;
+        if (!($user = $this->app['auth']->user())) return;
+        if (!isset($user->email) || !isset($user->id)) return;
+
+        $request->setAuthenticatedUser($user->email, $user->id, [
+            'email' => $user->email,
+            'name' => $user->name ?? null
+        ]);
+    }
+
+    // Get the session data (normalized with passwords removed)
+
+    public function reset()
+    {
+        $this->log = new Log;
+    }
+
+    // Add authenticated user data to the request
+
+    public function setResponse(Response $response)
+    {
+        $this->response = $response;
+        return $this;
+    }
+
+    // Get the request path info
+
+    public function listenToEvents()
+    {
+        if (!$this->collectLog) return;
+
+        if (class_exists(\Illuminate\Log\Events\MessageLogged::class)) {
+            // Lumen 5.4
+            $this->app['events']->listen(\Illuminate\Log\Events\MessageLogged::class, function ($event) {
+                $this->log->log($event->level, $event->message, $event->context);
+            });
+        } else {
+            // Lumen 5.0 to 5.3
+            $this->app['events']->listen('illuminate.log', function ($level, $message, $context) {
+                $this->log->log($level, $message, $context);
+            });
+        }
+    }
 }

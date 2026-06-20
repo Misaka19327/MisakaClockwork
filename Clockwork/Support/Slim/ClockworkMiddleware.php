@@ -1,144 +1,143 @@
 <?php namespace Clockwork\Support\Slim;
 
-use Clockwork\Clockwork;
 use Clockwork\Authentication\NullAuthenticator;
+use Clockwork\Clockwork;
 use Clockwork\DataSource\PsrMessageDataSource;
-use Clockwork\Storage\FileStorage;
 use Clockwork\Helpers\ServerTiming;
-
+use Clockwork\Storage\FileStorage;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 
 // Slim 4 middleware
 class ClockworkMiddleware
 {
-	protected $app;
-	protected $clockwork;
-	protected $startTime;
+    protected $app;
+    protected $clockwork;
+    protected $startTime;
 
-	public function __construct($app, $storagePathOrClockwork, $startTime = null)
-	{
-		$this->app = $app;
-		$this->clockwork = $storagePathOrClockwork instanceof Clockwork
-			? $storagePathOrClockwork : $this->createDefaultClockwork($storagePathOrClockwork);
-		$this->startTime = $startTime ?: microtime(true);
-	}
+    public function __construct($app, $storagePathOrClockwork, $startTime = null)
+    {
+        $this->app = $app;
+        $this->clockwork = $storagePathOrClockwork instanceof Clockwork
+            ? $storagePathOrClockwork : $this->createDefaultClockwork($storagePathOrClockwork);
+        $this->startTime = $startTime ?: microtime(true);
+    }
 
-	public function __invoke(Request $request, RequestHandler $handler)
-	{
-		return $this->process($request, $handler);
-	}
+    protected function createDefaultClockwork($storagePath)
+    {
+        $clockwork = new Clockwork();
 
-	public function process(Request $request, RequestHandler $handler)
-	{
-		$authUri = '#/__clockwork/auth#';
-		if (preg_match($authUri, $request->getUri()->getPath(), $matches)) {
-			return $this->authenticate($request);
-		}
+        $clockwork->storage(new FileStorage($storagePath));
+        $clockwork->authenticator(new NullAuthenticator);
 
-		$clockworkDetailsUri = '#/__clockwork/uuid/(?<uuid>[0-9a-fA-F-]{36})/details#';
-		if (preg_match($clockworkDetailsUri, $request->getUri()->getPath(), $matches)) {
-			return $this->retrieveRequestDetails($request, $matches['uuid']);
-		}
+        return $clockwork;
+    }
 
-		$clockworkDataUri = '#/__clockwork(?:/(?<id>([0-9-]+|latest)))?(?:/(?<direction>(?:previous|next)))?(?:/(?<count>\d+))?#';
-		if (preg_match($clockworkDataUri, $request->getUri()->getPath(), $matches)) {
-			$matches = array_merge([ 'id' => null, 'direction' => null, 'count' => null ], $matches);
-			return $this->retrieveRequest($request, $matches['id'], $matches['direction'], $matches['count']);
-		}
+    public function __invoke(Request $request, RequestHandler $handler)
+    {
+        return $this->process($request, $handler);
+    }
 
-		$response = $handler->handle($request);
+    public function process(Request $request, RequestHandler $handler)
+    {
+        $authUri = '#/__clockwork/auth#';
+        if (preg_match($authUri, $request->getUri()->getPath(), $matches)) {
+            return $this->authenticate($request);
+        }
 
-		return $this->logRequest($request, $response);
-	}
+        $clockworkDetailsUri = '#/__clockwork/uuid/(?<uuid>[0-9a-fA-F-]{36})/details#';
+        if (preg_match($clockworkDetailsUri, $request->getUri()->getPath(), $matches)) {
+            return $this->retrieveRequestDetails($request, $matches['uuid']);
+        }
 
-	protected function authenticate(Request $request)
-	{
-		$token = $this->clockwork->authenticator()->attempt($request->getParsedBody());
+        $clockworkDataUri = '#/__clockwork(?:/(?<id>([0-9-]+|latest)))?(?:/(?<direction>(?:previous|next)))?(?:/(?<count>\d+))?#';
+        if (preg_match($clockworkDataUri, $request->getUri()->getPath(), $matches)) {
+            $matches = array_merge(['id' => null, 'direction' => null, 'count' => null], $matches);
+            return $this->retrieveRequest($request, $matches['id'], $matches['direction'], $matches['count']);
+        }
 
-		return $this->jsonResponse([ 'token' => $token ], $token ? 200 : 403);
-	}
+        $response = $handler->handle($request);
 
-	protected function retrieveRequest(Request $request, $id, $direction, $count)
-	{
-		$authenticator = $this->clockwork->authenticator();
-		$storage = $this->clockwork->storage();
+        return $this->logRequest($request, $response);
+    }
 
-		$authenticated = $authenticator->check(current($request->getHeader('X-Clockwork-Auth')));
+    protected function authenticate(Request $request)
+    {
+        $token = $this->clockwork->authenticator()->attempt($request->getParsedBody());
 
-		if ($authenticated !== true) {
-			return $this->jsonResponse([ 'message' => $authenticated, 'requires' => $authenticator->requires() ], 403);
-		}
+        return $this->jsonResponse(['token' => $token], $token ? 200 : 403);
+    }
 
-		if ($direction == 'previous') {
-			$data = $storage->previous($id, $count);
-		} elseif ($direction == 'next') {
-			$data = $storage->next($id, $count);
-		} elseif ($id == 'latest') {
-			$data = $storage->latest();
-		} else {
-			$data = $storage->find($id);
-		}
+    protected function jsonResponse($data, $status = 200)
+    {
+        $response = $this->app->getResponseFactory()
+            ->createResponse($status)
+            ->withHeader('Content-Type', 'application/json');
 
-		return $this->jsonResponse($data);
-	}
+        $response->getBody()->write(json_encode($data));
 
-	protected function retrieveRequestDetails(Request $request, $uuid)
-	{
-		$authenticator = $this->clockwork->authenticator();
-		$storage = $this->clockwork->storage();
+        return $response;
+    }
 
-		$authenticated = $authenticator->check(current($request->getHeader('X-Clockwork-Auth')));
+    protected function retrieveRequestDetails(Request $request, $uuid)
+    {
+        $authenticator = $this->clockwork->authenticator();
+        $storage = $this->clockwork->storage();
 
-		if ($authenticated !== true) {
-			return $this->jsonResponse([ 'message' => $authenticated, 'requires' => $authenticator->requires() ], 403);
-		}
+        $authenticated = $authenticator->check(current($request->getHeader('X-Clockwork-Auth')));
 
-		$data = $storage->findByUuid($uuid);
+        if ($authenticated !== true) {
+            return $this->jsonResponse(['message' => $authenticated, 'requires' => $authenticator->requires()], 403);
+        }
 
-		return $this->jsonResponse($data ? $data->toEventDetails() : [ 'message' => 'Request not found.' ], $data ? 200 : 404);
-	}
+        $data = $storage->findByUuid($uuid);
 
-	protected function logRequest(Request $request, $response)
-	{
-		$this->clockwork->timeline()->finalize($this->startTime);
-		$this->clockwork->addDataSource(new PsrMessageDataSource($request, $response));
+        return $this->jsonResponse($data ? $data->toEventDetails() : ['message' => 'Request not found.'], $data ? 200 : 404);
+    }
 
-		$this->clockwork->resolveRequest();
-		$this->clockwork->storeRequest();
+    protected function retrieveRequest(Request $request, $id, $direction, $count)
+    {
+        $authenticator = $this->clockwork->authenticator();
+        $storage = $this->clockwork->storage();
 
-		$clockworkRequest = $this->clockwork->request();
+        $authenticated = $authenticator->check(current($request->getHeader('X-Clockwork-Auth')));
 
-		$response = $response
-			->withHeader('X-Clockwork-Id', $clockworkRequest->id)
-			->withHeader('X-Clockwork-Uuid', $clockworkRequest->uuid)
-			->withHeader('X-Clockwork-Version', Clockwork::VERSION);
+        if ($authenticated !== true) {
+            return $this->jsonResponse(['message' => $authenticated, 'requires' => $authenticator->requires()], 403);
+        }
 
-		if ($basePath = $this->app->getBasePath()) {
-			$response = $response->withHeader('X-Clockwork-Path', "$basePath/__clockwork/");
-		}
+        if ($direction == 'previous') {
+            $data = $storage->previous($id, $count);
+        } elseif ($direction == 'next') {
+            $data = $storage->next($id, $count);
+        } elseif ($id == 'latest') {
+            $data = $storage->latest();
+        } else {
+            $data = $storage->find($id);
+        }
 
-		return $response->withHeader('Server-Timing', ServerTiming::fromRequest($clockworkRequest)->value());
-	}
+        return $this->jsonResponse($data);
+    }
 
-	protected function createDefaultClockwork($storagePath)
-	{
-		$clockwork = new Clockwork();
+    protected function logRequest(Request $request, $response)
+    {
+        $this->clockwork->timeline()->finalize($this->startTime);
+        $this->clockwork->addDataSource(new PsrMessageDataSource($request, $response));
 
-		$clockwork->storage(new FileStorage($storagePath));
-		$clockwork->authenticator(new NullAuthenticator);
+        $this->clockwork->resolveRequest();
+        $this->clockwork->storeRequest();
 
-		return $clockwork;
-	}
+        $clockworkRequest = $this->clockwork->request();
 
-	protected function jsonResponse($data, $status = 200)
-	{
-		$response = $this->app->getResponseFactory()
-			->createResponse($status)
-			->withHeader('Content-Type', 'application/json');
+        $response = $response
+            ->withHeader('X-Clockwork-Id', $clockworkRequest->id)
+            ->withHeader('X-Clockwork-Uuid', $clockworkRequest->uuid)
+            ->withHeader('X-Clockwork-Version', Clockwork::VERSION);
 
-		$response->getBody()->write(json_encode($data));
+        if ($basePath = $this->app->getBasePath()) {
+            $response = $response->withHeader('X-Clockwork-Path', "$basePath/__clockwork/");
+        }
 
-		return $response;
-	}
+        return $response->withHeader('Server-Timing', ServerTiming::fromRequest($clockworkRequest)->value());
+    }
 }

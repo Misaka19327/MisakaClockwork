@@ -1,0 +1,396 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useApp } from '../context/AppContext.jsx'
+import { gsap, motionOk } from '../lib/motion.js'
+import { statusClass } from '../lib/format.js'
+import Sidebar from '../components/Sidebar.jsx'
+import Icon from '../components/Icon.jsx'
+import { DETAIL } from '../data/requests.js'
+import './request-detail.css'
+
+const TABS = [
+  { key: 'overview', label: '概览', icon: 'grid' },
+  { key: 'performance', label: '性能', icon: 'chart', sub: '时间线' },
+  { key: 'database', label: '数据库', icon: 'database' },
+  { key: 'cache', label: '缓存', icon: 'cache' },
+  { key: 'redis', label: 'Redis', icon: 'redis' },
+  { key: 'http', label: 'HTTP', icon: 'globe' },
+  { key: 'log', label: '日志', icon: 'log' },
+  { key: 'events', label: '事件', icon: 'events' },
+  { key: 'views', label: '视图', icon: 'views' },
+]
+
+function Kv({ k, v, title }) {
+  return (
+    <div className="kv-row">
+      <div className="kv-key">{k}</div>
+      <div className="kv-val" title={title != null ? title : (typeof v === 'string' ? v : '')}>{v}</div>
+    </div>
+  )
+}
+
+function fmtDur(ms) {
+  return ms > 1000 ? (ms / 1000).toFixed(1) + ' s' : ms.toFixed(1) + ' ms'
+}
+function fmtClock(unix) {
+  try { return new Date(unix * 1000).toISOString().slice(11, 23) } catch (_) { return '—' }
+}
+function barClass(color) {
+  return { blue: 'bar-blue', green: 'bar-green', purple: 'bar-purple', red: 'bar-red' }[color] || 'bar-grey'
+}
+
+export default function RequestDetail() {
+  const { t } = useApp()
+  const navigate = useNavigate()
+  const { id } = useParams()
+  const d = DETAIL // single mocked record (id kept for parity)
+  const [tab, setTab] = useState('overview')
+  const panelRef = useRef(null)
+
+  const counts = {
+    database: d.dbStats.count,
+    cache: d.cacheQueries.length,
+    redis: d.redisCommands.length,
+    http: d.httpRequests.length,
+    log: d.logs.length,
+    events: d.events.length,
+    views: d.viewsData.length,
+  }
+
+  useEffect(() => {
+    if (!motionOk()) return
+    const ctx = gsap.context(() => {
+      gsap.from('.header-card', { opacity: 0, y: -12, duration: 0.35, ease: 'power2.out' })
+      gsap.from('.sidebar', { opacity: 0, x: -20, duration: 0.3, ease: 'power2.out', delay: 0.05 })
+      gsap.from('.tab-bar button', { opacity: 0, y: -8, duration: 0.25, stagger: 0.035, ease: 'power2.out', delay: 0.12 })
+      if (d.failed) gsap.from('.failure-banner.show', { opacity: 0, y: -12, duration: 0.3, ease: 'power2.out', delay: 0.35 })
+    })
+    return () => ctx.revert()
+  }, [])
+
+  // Animate panel entrance on tab change.
+  useEffect(() => {
+    if (!motionOk() || !panelRef.current) return
+    const ctx = gsap.context(() => {
+      gsap.fromTo('.tab-panel', { opacity: 0, y: 4 }, { opacity: 1, y: 0, duration: 0.15, ease: 'power2.out' })
+      if (tab === 'performance') {
+        gsap.fromTo('.tl-bar', { scaleX: 0, transformOrigin: 'left center' }, { scaleX: 1, duration: 0.5, stagger: 0.04, ease: 'power2.out', delay: 0.05 })
+      }
+    }, panelRef)
+    return () => ctx.revert()
+  }, [tab])
+
+  const bars = useMemo(() => {
+    const total = d.totalDuration
+    const all = [
+      ...d.timelineData.map(e => ({ label: e.description, start: e.start, end: e.end, color: e.color || 'grey' })),
+      ...d.databaseQueries.map((q, i) => {
+        const fs = [20, 70, 105, 160][i] || (180 + i * 8)
+        const s = q.duration > 100 ? total - q.duration - (i * 5) : fs
+        return { label: 'SQL #' + (i + 1), start: s, end: s + q.duration, color: (q.tags && q.tags.includes('slow')) ? 'red' : 'green' }
+      }),
+      ...d.httpRequests.map((r, i) => ({ label: 'HTTP #' + (i + 1), start: total - r.duration - 100 - i * 30, end: total - 100 - i * 30, color: 'purple' })),
+      ...d.cacheQueries.map((c, i) => ({ label: 'Cache #' + (i + 1), start: 5 + i * 2, end: 5 + i * 2 + (c.duration || 0.5), color: 'grey' })),
+    ]
+    return all.sort((a, b) => a.start - b.start)
+  }, [])
+
+  const pct = (v) => Math.max(0, Math.min(100, (v / d.totalDuration) * 100))
+
+  return (
+    <div className="request-detail-page">
+      <Sidebar variant="detail" />
+
+      <main className="main">
+        <div className="header-card">
+          <button className="back-btn" title={t('返回列表')} onClick={() => navigate('/requests')}>←</button>
+          <div className="header-meta">
+            <span className="req-method">{d.method}</span>
+            <span className="req-uri">{d.uri}</span>
+            <span className={`req-status ${statusClass(d.status)}`}>{d.status}</span>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>{d.controller}</span>
+          </div>
+          <div className="header-stats">
+            <div className="header-stat"><div className="stat-val">{fmtDur(d.duration)}</div><div className="stat-lbl">{t('耗时')}</div></div>
+            <div className="header-stat"><div className="stat-val">{(d.memory / 1e6).toFixed(1)} MB</div><div className="stat-lbl">{t('内存')}</div></div>
+            <div className="header-stat"><div className="stat-val">{d.dbStats.count}</div><div className="stat-lbl">{t('查询')}</div></div>
+            <div className="header-stat"><div className="stat-val">{d.dbStats.slow}</div><div className="stat-lbl">{t('慢查询')}</div></div>
+          </div>
+        </div>
+
+        <div className={`failure-banner ${d.failed ? 'show' : ''}`}>
+          <strong><Icon name="warning" size={14} /> {t('请求失败')}</strong> — <span>{d.failureMsg}</span>
+        </div>
+
+        <div className="tab-bar">
+          {TABS.map(tb => (
+            <button key={tb.key} className={tab === tb.key ? 'active' : ''} onClick={() => setTab(tb.key)}>
+              <Icon name={tb.icon} size={13} />
+              <span>{t(tb.label)}</span>
+              {tb.sub && <span className="tab-count">{t(tb.sub)}</span>}
+              {counts[tb.key] != null && <span className="tab-count">{counts[tb.key]}</span>}
+            </button>
+          ))}
+        </div>
+
+        <div className="tab-content" ref={panelRef}>
+          <div className="tab-panel">
+            {tab === 'overview' && <OverviewPanel d={d} t={t} />}
+            {tab === 'performance' && <PerformancePanel d={d} t={t} bars={bars} pct={pct} />}
+            {tab === 'database' && <DatabasePanel d={d} t={t} />}
+            {tab === 'cache' && <CachePanel d={d} t={t} />}
+            {tab === 'redis' && <RedisPanel d={d} t={t} />}
+            {tab === 'http' && <HttpPanel d={d} t={t} />}
+            {tab === 'log' && <LogPanel d={d} t={t} />}
+            {tab === 'events' && <EventsPanel d={d} t={t} />}
+            {tab === 'views' && <ViewsPanel d={d} t={t} />}
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+/* ── Panels ── */
+
+function OverviewPanel({ d, t }) {
+  const emptyNone = (label) => (
+    <div className="kv-list"><div className="kv-row"><div className="kv-key" style={{ width: '100%', textAlign: 'center', color: 'var(--muted)' }}>（{label}）</div></div></div>
+  )
+  return (
+    <>
+      <div className="section-title">{t('请求与响应上下文')}</div>
+      <div className="kv-list mb12">
+        <Kv k="ID" v={d.id} />
+        <Kv k="UUID" v={d.uuid} />
+        <Kv k={t('类型')} v={d.type} />
+        <Kv k={t('时间')} v={d.timeStr} />
+        <Kv k={t('方法')} v={d.method} />
+        <Kv k="URI" v={d.uri} />
+        <Kv k={t('状态')} v={String(d.status)} />
+      </div>
+
+      <div className="section-title mt20">{t('Query 参数')}</div>
+      <div className="kv-list mb12">
+        {Object.keys(d.getData).length
+          ? Object.entries(d.getData).map(([k, v]) => <Kv key={k} k={k} v={String(v)} />)
+          : <div className="kv-row"><div className="kv-key" style={{ width: '100%', textAlign: 'center', color: 'var(--muted)' }}>（{t('无')}）</div></div>}
+      </div>
+
+      <div className="section-title mt20">{t('请求头')}</div>
+      <div className="kv-list mb12">
+        {Object.entries(d.headers).map(([k, v]) => <Kv key={k} k={k} v={String(v)} />)}
+      </div>
+
+      <div className="section-title mt20">{t('已认证用户')}</div>
+      <div className="kv-list mb12">
+        {d.authenticatedUser
+          ? Object.entries(d.authenticatedUser).map(([k, v]) => <Kv key={k} k={k} v={String(v)} />)
+          : <div className="kv-row"><div className="kv-key" style={{ width: '100%', textAlign: 'center', color: 'var(--muted)' }}>（{t('未认证')}）</div></div>}
+      </div>
+
+      <div className="section-title mt20">{t('中间件')}</div>
+      <div className="kv-list">
+        {d.middleware.map(m => (
+          <div className="kv-row" key={m}><div className="kv-val" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{m}</div></div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function PerformancePanel({ d, t, bars, pct }) {
+  return (
+    <>
+      <div className="detail-kpi-row">
+        <div className="kpi-card"><div className="kpi-val">{d.dbStats.count}</div><div className="kpi-lbl">{t('数据库查询')}</div></div>
+        <div className="kpi-card"><div className="kpi-val">{d.dbStats.slow}</div><div className="kpi-lbl">{t('慢查询')}</div></div>
+        <div className="kpi-card"><div className="kpi-val">{d.dbStats.duration.toFixed(0)} ms</div><div className="kpi-lbl">DB {t('总耗时')}</div></div>
+        <div className="kpi-card"><div className="kpi-val">{d.cacheStats.reads}</div><div className="kpi-lbl">{t('缓存')}</div></div>
+        <div className="kpi-card"><div className="kpi-val">{d.cacheStats.hits}/{d.cacheStats.reads}</div><div className="kpi-lbl">{t('命中率')}</div></div>
+      </div>
+
+      <div className="timeline-wrap">
+        <h3><Icon name="clock" size={14} /> {t('时间线')}</h3>
+        <div className="tl-legend">
+          <span><span className="swatch" style={{ background: 'oklch(55% 0.14 250)' }} />{t('控制器 / 框架')}</span>
+          <span><span className="swatch" style={{ background: 'oklch(50% 0.14 150)' }} />{t('数据库')}</span>
+          <span><span className="swatch" style={{ background: 'oklch(50% 0.14 290)' }} />{t('HTTP / 中间件')}</span>
+          <span><span className="swatch" style={{ background: 'var(--danger)' }} />{t('慢查询 / 错误')}</span>
+          <span><span className="swatch" style={{ background: 'oklch(55% 0.01 250)' }} />{t('缓存 / 其他')}</span>
+        </div>
+        <div className="tl-axis">
+          <span>0 ms</span>
+          <span>{(d.totalDuration / 4).toFixed(0)} ms</span>
+          <span>{(d.totalDuration / 2).toFixed(0)} ms</span>
+          <span>{(d.totalDuration * 0.75).toFixed(0)} ms</span>
+          <span>{d.totalDuration.toFixed(0)} ms</span>
+        </div>
+        {bars.map((b, i) => (
+          <div className="tl-row" key={i}>
+            <div className="tl-label">{b.label}</div>
+            <div className="tl-track">
+              <div className={`tl-bar ${barClass(b.color)}`} style={{ left: pct(b.start) + '%', width: Math.max(pct(b.end - b.start), 0.3) + '%' }}>
+                {(b.end - b.start).toFixed(1)} ms
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function DatabasePanel({ d, t }) {
+  return (
+    <>
+      <div className="section-title">{t('数据库查询')} <span className="count">({d.dbStats.count})</span></div>
+      <table className="data-table mb12">
+        <thead><tr><th>#</th><th>{t('SQL')}</th><th>{t('耗时')}</th><th>{t('连接')}</th><th>{t('来源')}</th></tr></thead>
+        <tbody>
+          {d.databaseQueries.map((q, i) => (
+            <tr key={i}>
+              <td className="mono">{i + 1}</td>
+              <td className="sql-cell" title={q.query}>
+                {q.query}
+                {q.tags && q.tags.includes('slow') && <span className="tag-slow">{t('慢')}</span>}
+                {q.tags && q.tags.includes('n+1') && <span className="tag-n1">N+1</span>}
+              </td>
+              <td className="dur-cell">{q.duration.toFixed(1)} ms</td>
+              <td className="mono">{q.connection}</td>
+              <td className="mono">{q.file}:{q.line}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+function CachePanel({ d, t }) {
+  return (
+    <>
+      <div className="section-title">{t('缓存操作')} <span className="count">({d.cacheQueries.length})</span></div>
+      <table className="data-table">
+        <thead><tr><th>{t('类型')}</th><th>{t('键')}</th><th>{t('值')}</th><th>{t('耗时')}</th><th>{t('连接')}</th></tr></thead>
+        <tbody>
+          {d.cacheQueries.map((c, i) => (
+            <tr key={i}>
+              <td><span className={`cache-type ${c.type}`}>{c.type}</span></td>
+              <td className="mono">{c.key}</td>
+              <td className="mono" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.value || '—'}</td>
+              <td className="dur-cell">{c.duration ? c.duration.toFixed(1) + ' ms' : '—'}</td>
+              <td className="mono">{c.connection}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+function RedisPanel({ d, t }) {
+  return (
+    <>
+      <div className="section-title">{t('Redis 命令')} <span className="count">({d.redisCommands.length})</span></div>
+      <table className="data-table">
+        <thead><tr><th>{t('命令')}</th><th>{t('键')}</th><th>{t('参数')}</th><th>{t('耗时')}</th></tr></thead>
+        <tbody>
+          {d.redisCommands.map((r, i) => (
+            <tr key={i}>
+              <td className="mono" style={{ fontWeight: 590 }}>{r.command}</td>
+              <td className="mono">{r.key || '—'}</td>
+              <td className="mono" style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{JSON.stringify(r.parameters)}</td>
+              <td className="dur-cell">{r.duration.toFixed(1)} ms</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+function HttpPanel({ d, t }) {
+  return (
+    <>
+      <div className="section-title">{t('出站 HTTP 请求')} <span className="count">({d.httpRequests.length})</span></div>
+      <table className="data-table">
+        <thead><tr><th>{t('方法')}</th><th>URL</th><th>{t('状态')}</th><th>{t('耗时')}</th><th>{t('错误')}</th></tr></thead>
+        <tbody>
+          {d.httpRequests.map((r, i) => {
+            const bad = (r.response && r.response.status >= 400) || r.error
+            return (
+              <tr key={i} style={bad ? { background: 'oklch(96% 0.015 25)' } : undefined}>
+                <td className="mono" style={{ fontWeight: 590 }}>{r.request.method}</td>
+                <td className="mono" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.request.url}>{r.request.url}</td>
+                <td className="mono">{r.response ? r.response.status : '—'}</td>
+                <td className="dur-cell">{r.duration.toFixed(1)} ms</td>
+                <td className="mono" style={{ color: 'var(--danger)' }}>{r.error || '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+function LogPanel({ d, t }) {
+  return (
+    <>
+      <div className="section-title">{t('日志记录')} <span className="count">({d.logs.length})</span></div>
+      <table className="data-table">
+        <thead><tr><th>{t('级别')}</th><th>{t('消息')}</th><th>{t('时间')}</th></tr></thead>
+        <tbody>
+          {d.logs.map((l, i) => (
+            <tr key={i}>
+              <td><span className={`log-level ${l.level}`}>{l.level}</span></td>
+              <td>{l.message}</td>
+              <td className="mono">{fmtClock(l.time)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+function EventsPanel({ d, t }) {
+  return (
+    <>
+      <div className="section-title">{t('事件派发')} <span className="count">({d.events.length})</span></div>
+      <table className="data-table">
+        <thead><tr><th>{t('事件')}</th><th>{t('数据')}</th><th>{t('监听器')}</th><th>{t('耗时')}</th></tr></thead>
+        <tbody>
+          {d.events.map((e, i) => (
+            <tr key={i}>
+              <td className="mono" style={{ fontSize: 11 }}>{e.event}</td>
+              <td className="mono" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{JSON.stringify(e.data)}</td>
+              <td className="mono" style={{ fontSize: 11 }}>{(e.listeners || []).join(', ') || '—'}</td>
+              <td className="dur-cell">{e.duration ? e.duration.toFixed(1) + ' ms' : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+function ViewsPanel({ d, t }) {
+  return (
+    <>
+      <div className="section-title">{t('视图渲染')} <span className="count">({d.viewsData.length})</span></div>
+      <table className="data-table">
+        <thead><tr><th>{t('视图')}</th><th>{t('耗时')}</th></tr></thead>
+        <tbody>
+          {d.viewsData.map((v, i) => (
+            <tr key={i}>
+              <td className="mono">{v.data.name}</td>
+              <td className="dur-cell">{v.duration.toFixed(1)} ms</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}

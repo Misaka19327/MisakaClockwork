@@ -1,0 +1,10 @@
+/* Request list page — ported from request-list.html. Shell/sidebar/topbar/badges are shared. */
+
+.request-list-page { display: flex; height: 100vh; overflow: hidden; }
+
+.list-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.list-table tbody tr { cursor: pointer; }
+.list-table tbody tr:hover { background: oklch(97% 0.006 250); }
+html[data-theme="dark"] .list-table tbody tr:hover { background: oklch(22% 0.012 250) !important; }
+
+.list-table .filter-pill svg { vertical-align: -2px; margin-right: 4px; }

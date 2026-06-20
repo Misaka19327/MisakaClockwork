@@ -5,30 +5,30 @@ use Clockwork\Request\Request;
 // Interface for requests storage implementations
 interface StorageInterface
 {
-	// Returns all requests
-	public function all(?Search $search = null);
+    // Returns all requests
+    public function all(?Search $search = null);
 
-	// Return a single request by id
-	public function find($id);
+    // Return a single request by id
+    public function find($id);
 
-	// Return a single request by uuid
-	public function findByUuid($uuid);
+    // Return a single request by uuid
+    public function findByUuid($uuid);
 
-	// Return the latest request
-	public function latest(?Search $search = null);
+    // Return the latest request
+    public function latest(?Search $search = null);
 
-	// Return requests received before specified id, optionally limited to specified count
-	public function previous($id, $count = null, ?Search $search = null);
+    // Return requests received before specified id, optionally limited to specified count
+    public function previous($id, $count = null, ?Search $search = null);
 
-	// Return requests received after specified id, optionally limited to specified count
-	public function next($id, $count = null, ?Search $search = null);
+    // Return requests received after specified id, optionally limited to specified count
+    public function next($id, $count = null, ?Search $search = null);
 
-	// Store request
-	public function store(Request $request);
+    // Store request
+    public function store(Request $request);
 
-	// Update existing request
-	public function update(Request $request);
+    // Update existing request
+    public function update(Request $request);
 
-	// Cleanup old requests
-	public function cleanup();
+    // Cleanup old requests
+    public function cleanup();
 }
