@@ -188,8 +188,3 @@ export const CATEGORIES = {
 }
 
 export const CATEGORY_ORDER = ['database', 'cache', 'redis', 'log', 'events', 'views', 'notifications']
-
-// Sidebar badge counts (from the prototype sidebar)
-export const NAV_COUNTS = {
-  database: '5.8k', cache: '3.2k', redis: '4.1k', log: '8.9k', events: '1.4k', views: '2.8k', notifications: '856',
-}

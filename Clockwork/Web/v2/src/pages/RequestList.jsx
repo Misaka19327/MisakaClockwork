@@ -84,7 +84,7 @@ export default function RequestList() {
 
   return (
     <div className="request-list-page">
-      <div ref={sidebarRef}><Sidebar variant="list" /></div>
+      <div ref={sidebarRef}><Sidebar /></div>
 
       <main className="main">
         <div className="topbar" ref={topbarRef}>

@@ -311,6 +311,7 @@ class ClockworkSupport
         $db = ['queries' => 0, 'slow' => 0, 'duration' => 0.0, 'selects' => 0, 'inserts' => 0, 'updates' => 0, 'deletes' => 0, 'others' => 0];
         $cache = ['reads' => 0, 'hits' => 0, 'writes' => 0, 'deletes' => 0, 'time' => 0.0];
         $redis = 0;
+        $events = 0; $views = 0; $notifications = 0;
         $log = ['total' => 0, 'errors' => 0, 'byLevel' => []];
 
         while ($cursor) {
@@ -341,6 +342,12 @@ class ClockworkSupport
 
             $redis += count($r->redisCommands ?: []);
 
+            $events        += count($r->events ?: []);
+            $views         += count($r->viewsData ?: []);
+            // Match operationsArray('notifications'), which folds legacy emailsData in too —
+            // otherwise the sidebar badge underreports vs. the operations list.
+            $notifications += count($r->notifications ?: []) + count($r->emailsData ?: []);
+
             foreach ($r->log ?: [] as $entry) {
                 $log['total']++;
                 $level = $entry['level'] ?? 'info';
@@ -361,6 +368,9 @@ class ClockworkSupport
             'database' => $db,
             'cache' => array_merge($cache, ['hitRate' => $cache['reads'] ? round($cache['hits'] / $cache['reads'] * 100, 1) : 0]),
             'redis' => ['commands' => $redis],
+            'events' => ['count' => $events],
+            'views' => ['count' => $views],
+            'notifications' => ['count' => $notifications],
             'log' => $log,
         ]);
     }

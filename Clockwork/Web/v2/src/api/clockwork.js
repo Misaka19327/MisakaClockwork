@@ -33,6 +33,22 @@ export function clearToken() {
   try { sessionStorage.removeItem(TOKEN_KEY); localStorage.removeItem(TOKEN_KEY) } catch (_) { /* ignore */ }
 }
 
+// Auth-required bridge to the router. The request layer can't navigate on its own, so App
+// (which lives inside <HashRouter>) registers a callback via setAuthRequiredHandler. When the
+// backend replies 403 with a non-empty `requires` array, we drop any stale token and invoke it,
+// so App can redirect to /login. NullAuthenticator never returns 403, so this only fires when
+// authentication is actually configured — matching the official Clockwork web app behavior, where
+// no login page is ever shown when no key is set.
+let authRequiredHandler = null
+
+export function setAuthRequiredHandler(fn) { authRequiredHandler = fn }
+export function clearAuthRequiredHandler() { authRequiredHandler = null }
+
+function triggerAuthRequired() {
+  clearToken()
+  if (authRequiredHandler) authRequiredHandler()
+}
+
 async function request(path, { method = 'GET', body, auth = true } = {}) {
   const headers = { Accept: 'application/json' }
   if (auth) {
@@ -53,8 +69,16 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
   const ct = res.headers.get('content-type') || ''
   if (!res.ok) {
     let msg = `HTTP ${res.status}`
+    let payload = null
     if (ct.includes('json')) {
-      try { const j = await res.json(); msg = j.message || j.detail || msg } catch (_) { /* ignore */ }
+      try { payload = await res.json(); msg = payload.message || payload.detail || msg } catch (_) { /* ignore */ }
+    }
+    // 403 + a non-empty `requires` array (eg. ['password']) is the backend's "authentication
+    // required" signal — route to /login via the registered handler. The POST /auth wrong-password
+    // 403 carries only `{ token: false }` (no `requires`), so it falls through as a normal error
+    // and the Login page shows "incorrect key".
+    if (res.status === 403 && payload && Array.isArray(payload.requires) && payload.requires.length) {
+      triggerAuthRequired()
     }
     const err = new Error(msg)
     err.status = res.status

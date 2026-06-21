@@ -124,7 +124,7 @@ export default function RequestDetail() {
 
   return (
     <div className="request-detail-page">
-      <Sidebar variant="detail" />
+      <Sidebar />
 
       <main className="main">
         {loading && (
@@ -316,7 +316,7 @@ function CachePanel({ d, t }) {
             <tr key={i}>
               <td><span className={`cache-type ${c.type}`}>{c.type}</span></td>
               <td className="mono">{c.key}</td>
-              <td className="mono" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.value || '—'}</td>
+              <td className="mono" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(c.value)}>{fmtVal(c.value)}</td>
               <td className="dur-cell">{c.duration ? c.duration.toFixed(1) + ' ms' : '—'}</td>
               <td className="mono">{c.connection}</td>
             </tr>
@@ -338,7 +338,7 @@ function RedisPanel({ d, t }) {
             <tr key={i}>
               <td className="mono" style={{ fontWeight: 590 }}>{r.command}</td>
               <td className="mono">{r.key || '—'}</td>
-              <td className="mono" style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{JSON.stringify(r.parameters)}</td>
+              <td className="mono" style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(r.parameters)}>{fmtVal(r.parameters)}</td>
               <td className="dur-cell">{r.duration.toFixed(1)} ms</td>
             </tr>
           ))}
@@ -403,7 +403,7 @@ function EventsPanel({ d, t }) {
           {d.events.map((e, i) => (
             <tr key={i}>
               <td className="mono" style={{ fontSize: 11 }}>{e.event}</td>
-              <td className="mono" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{JSON.stringify(e.data)}</td>
+              <td className="mono" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(e.data)}>{fmtVal(e.data)}</td>
               <td className="mono" style={{ fontSize: 11 }}>{(e.listeners || []).join(', ') || '—'}</td>
               <td className="dur-cell">{e.duration ? e.duration.toFixed(1) + ' ms' : '—'}</td>
             </tr>

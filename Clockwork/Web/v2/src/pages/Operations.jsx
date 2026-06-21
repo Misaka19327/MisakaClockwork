@@ -541,7 +541,7 @@ export default function Operations() {
 
   return (
     <div className="operations-page">
-      <Sidebar variant="operations" />
+      <Sidebar />
 
       <main className="main">
         <div className="topbar">
