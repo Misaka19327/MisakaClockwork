@@ -6,6 +6,7 @@ import { statusClass } from '../lib/format.js'
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { api, toDetail } from '../api/clockwork.js'
+import { ExpandableCode, ExpandableTrace } from '../components/ExpandableCode.jsx'
 import './request-detail.css'
 
 const TABS = [
@@ -36,6 +37,32 @@ function Kv({ k, v, title }) {
     <div className="kv-row">
       <div className="kv-key">{k}</div>
       <div className="kv-val" title={title != null ? title : s}>{s}</div>
+    </div>
+  )
+}
+
+// Toggle a set of expanded row indices — multiple rows can be open at once (each click flips one).
+function useToggleSet() {
+  const [open, setOpen] = useState(() => new Set())
+  const toggle = (i) => setOpen((prev) => {
+    const next = new Set(prev)
+    next.has(i) ? next.delete(i) : next.add(i)
+    return next
+  })
+  return [open, toggle]
+}
+
+// items: [{ k, v, full? }] — k is a label, v is a string or JSX (badge / ExpandableCode /
+// ExpandableTrace); full spans the whole grid row for long content. Renders the shared detail-grid.
+function DetailFields({ items }) {
+  return (
+    <div className="detail-grid">
+      {items.map((it, idx) => (
+        <div key={idx} className={`detail-item${it.full ? ' full' : ''}`}>
+          <span className="dk">{it.k}</span>
+          <span className="dv">{it.v}</span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -280,25 +307,46 @@ function PerformancePanel({ d, t, bars, pct }) {
 }
 
 function DatabasePanel({ d, t }) {
+  const [open, toggle] = useToggleSet()
   return (
     <>
       <div className="section-title">{t('数据库查询')} <span className="count">({d.dbStats.count})</span></div>
       <table className="data-table mb12">
         <thead><tr><th>#</th><th>{t('SQL')}</th><th>{t('耗时')}</th><th>{t('连接')}</th><th>{t('来源')}</th></tr></thead>
         <tbody>
-          {d.databaseQueries.map((q, i) => (
-            <tr key={i}>
-              <td className="mono">{i + 1}</td>
-              <td className="sql-cell" title={q.query}>
-                {q.query}
-                {q.tags && q.tags.includes('slow') && <span className="tag-slow">{t('慢')}</span>}
-                {q.tags && q.tags.includes('n+1') && <span className="tag-n1">N+1</span>}
-              </td>
-              <td className="dur-cell">{q.duration.toFixed(1)} ms</td>
-              <td className="mono">{q.connection}</td>
-              <td className="mono">{q.file}:{q.line}</td>
-            </tr>
-          ))}
+          {d.databaseQueries.flatMap((q, i) => {
+            const isExp = open.has(i)
+            const main = (
+              <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => toggle(i)}>
+                <td className="mono">{i + 1}</td>
+                <td className="sql-cell" title={q.query}>
+                  {q.query}
+                  {q.tags && q.tags.includes('slow') && <span className="tag-slow">{t('慢')}</span>}
+                  {q.tags && q.tags.includes('n+1') && <span className="tag-n1">N+1</span>}
+                </td>
+                <td className="dur-cell">{q.duration.toFixed(1)} ms</td>
+                <td className="mono">{q.connection}</td>
+                <td className="mono">{q.file}:{q.line}</td>
+              </tr>
+            )
+            if (!isExp) return [main]
+            return [main, (
+              <tr key={`d${i}`} className="detail-row">
+                <td colSpan={5}>
+                  <div className="detail-panel">
+                    <DetailFields items={[
+                      { k: t('类型'), v: q.type ? <span className={`cell-type-badge ${q.type}`}>{q.type}</span> : '—' },
+                      { k: t('模型'), v: q.model || '—' },
+                      { k: t('标签'), v: (q.tags && q.tags.length) ? q.tags.map(tg => <span key={tg} className={tg === 'slow' ? 'tag-slow' : 'tag-n1'}>{tg}</span>) : '—' },
+                      { k: t('绑定值'), v: <ExpandableCode text={JSON.stringify(q.bindings ?? {}, null, 2)} />, full: true },
+                      { k: t('调用栈'), v: <ExpandableTrace trace={q.trace || []} />, full: true },
+                      { k: t('完整 SQL'), v: <ExpandableCode text={q.query} />, full: true },
+                    ]} />
+                  </div>
+                </td>
+              </tr>
+            )]
+          })}
         </tbody>
       </table>
     </>
@@ -306,21 +354,38 @@ function DatabasePanel({ d, t }) {
 }
 
 function CachePanel({ d, t }) {
+  const [open, toggle] = useToggleSet()
   return (
     <>
       <div className="section-title">{t('缓存操作')} <span className="count">({d.cacheQueries.length})</span></div>
       <table className="data-table">
         <thead><tr><th>{t('类型')}</th><th>{t('键')}</th><th>{t('值')}</th><th>{t('耗时')}</th><th>{t('连接')}</th></tr></thead>
         <tbody>
-          {d.cacheQueries.map((c, i) => (
-            <tr key={i}>
-              <td><span className={`cache-type ${c.type}`}>{c.type}</span></td>
-              <td className="mono">{c.key}</td>
-              <td className="mono" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(c.value)}>{fmtVal(c.value)}</td>
-              <td className="dur-cell">{c.duration ? c.duration.toFixed(1) + ' ms' : '—'}</td>
-              <td className="mono">{c.connection}</td>
-            </tr>
-          ))}
+          {d.cacheQueries.flatMap((c, i) => {
+            const isExp = open.has(i)
+            const main = (
+              <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => toggle(i)}>
+                <td><span className={`cache-type ${c.type}`}>{c.type}</span></td>
+                <td className="mono">{c.key}</td>
+                <td className="mono" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(c.value)}>{fmtVal(c.value)}</td>
+                <td className="dur-cell">{c.duration ? c.duration.toFixed(1) + ' ms' : '—'}</td>
+                <td className="mono">{c.connection}</td>
+              </tr>
+            )
+            if (!isExp) return [main]
+            return [main, (
+              <tr key={`d${i}`} className="detail-row">
+                <td colSpan={5}>
+                  <div className="detail-panel">
+                    <DetailFields items={[
+                      { k: t('过期'), v: c.expiration ? `${c.expiration} s` : '—' },
+                      { k: t('完整值'), v: <ExpandableCode text={fmtVal(c.value)} />, full: true },
+                    ]} />
+                  </div>
+                </td>
+              </tr>
+            )]
+          })}
         </tbody>
       </table>
     </>
@@ -328,20 +393,37 @@ function CachePanel({ d, t }) {
 }
 
 function RedisPanel({ d, t }) {
+  const [open, toggle] = useToggleSet()
   return (
     <>
       <div className="section-title">{t('Redis 命令')} <span className="count">({d.redisCommands.length})</span></div>
       <table className="data-table">
         <thead><tr><th>{t('命令')}</th><th>{t('键')}</th><th>{t('参数')}</th><th>{t('耗时')}</th></tr></thead>
         <tbody>
-          {d.redisCommands.map((r, i) => (
-            <tr key={i}>
-              <td className="mono" style={{ fontWeight: 590 }}>{r.command}</td>
-              <td className="mono">{r.key || '—'}</td>
-              <td className="mono" style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(r.parameters)}>{fmtVal(r.parameters)}</td>
-              <td className="dur-cell">{r.duration.toFixed(1)} ms</td>
-            </tr>
-          ))}
+          {d.redisCommands.flatMap((r, i) => {
+            const isExp = open.has(i)
+            const main = (
+              <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => toggle(i)}>
+                <td className="mono" style={{ fontWeight: 590 }}>{r.command}</td>
+                <td className="mono">{r.key || '—'}</td>
+                <td className="mono" style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(r.parameters)}>{fmtVal(r.parameters)}</td>
+                <td className="dur-cell">{r.duration.toFixed(1)} ms</td>
+              </tr>
+            )
+            if (!isExp) return [main]
+            return [main, (
+              <tr key={`d${i}`} className="detail-row">
+                <td colSpan={4}>
+                  <div className="detail-panel">
+                    <DetailFields items={[
+                      { k: t('连接'), v: r.connection || '—' },
+                      { k: t('完整参数'), v: <ExpandableCode text={JSON.stringify(r.parameters ?? [], null, 2)} />, full: true },
+                    ]} />
+                  </div>
+                </td>
+              </tr>
+            )]
+          })}
         </tbody>
       </table>
     </>
@@ -349,16 +431,18 @@ function RedisPanel({ d, t }) {
 }
 
 function HttpPanel({ d, t }) {
+  const [open, toggle] = useToggleSet()
   return (
     <>
       <div className="section-title">{t('出站 HTTP 请求')} <span className="count">({d.httpRequests.length})</span></div>
       <table className="data-table">
         <thead><tr><th>{t('方法')}</th><th>URL</th><th>{t('状态')}</th><th>{t('耗时')}</th><th>{t('错误')}</th></tr></thead>
         <tbody>
-          {d.httpRequests.map((r, i) => {
+          {d.httpRequests.flatMap((r, i) => {
+            const isExp = open.has(i)
             const bad = (r.response && r.response.status >= 400) || r.error
-            return (
-              <tr key={i} style={bad ? { background: 'oklch(96% 0.015 25)' } : undefined}>
+            const main = (
+              <tr key={`r${i}`} className={isExp ? 'expanded' : ''} style={bad ? { background: 'oklch(96% 0.015 25)' } : undefined} onClick={() => toggle(i)}>
                 <td className="mono" style={{ fontWeight: 590 }}>{r.request.method}</td>
                 <td className="mono" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.request.url}>{r.request.url}</td>
                 <td className="mono">{r.response ? r.response.status : '—'}</td>
@@ -366,6 +450,21 @@ function HttpPanel({ d, t }) {
                 <td className="mono" style={{ color: 'var(--danger)' }}>{r.error || '—'}</td>
               </tr>
             )
+            if (!isExp) return [main]
+            return [main, (
+              <tr key={`d${i}`} className="detail-row">
+                <td colSpan={5}>
+                  <div className="detail-panel">
+                    <DetailFields items={[
+                      { k: t('请求头'), v: <ExpandableCode text={JSON.stringify(r.request?.headers ?? {}, null, 2)} />, full: true },
+                      { k: t('请求体'), v: <ExpandableCode text={fmtVal(r.request?.body)} />, full: true },
+                      { k: t('响应头'), v: <ExpandableCode text={JSON.stringify(r.response?.headers ?? {}, null, 2)} />, full: true },
+                      { k: t('响应体'), v: <ExpandableCode text={fmtVal(r.response?.body)} />, full: true },
+                    ]} />
+                  </div>
+                </td>
+              </tr>
+            )]
           })}
         </tbody>
       </table>
@@ -374,19 +473,36 @@ function HttpPanel({ d, t }) {
 }
 
 function LogPanel({ d, t }) {
+  const [open, toggle] = useToggleSet()
   return (
     <>
       <div className="section-title">{t('日志记录')} <span className="count">({d.logs.length})</span></div>
       <table className="data-table">
         <thead><tr><th>{t('级别')}</th><th>{t('消息')}</th><th>{t('时间')}</th></tr></thead>
         <tbody>
-          {d.logs.map((l, i) => (
-            <tr key={i}>
-              <td><span className={`log-level ${l.level}`}>{l.level}</span></td>
-              <td>{l.message}</td>
-              <td className="mono">{fmtClock(l.time)}</td>
-            </tr>
-          ))}
+          {d.logs.flatMap((l, i) => {
+            const isExp = open.has(i)
+            const main = (
+              <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => toggle(i)}>
+                <td><span className={`log-level ${l.level}`}>{l.level}</span></td>
+                <td>{l.message}</td>
+                <td className="mono">{fmtClock(l.time)}</td>
+              </tr>
+            )
+            if (!isExp) return [main]
+            return [main, (
+              <tr key={`d${i}`} className="detail-row">
+                <td colSpan={3}>
+                  <div className="detail-panel">
+                    <DetailFields items={[
+                      { k: t('上下文'), v: <ExpandableCode text={JSON.stringify(l.context ?? {}, null, 2)} />, full: true },
+                      { k: t('调用栈'), v: <ExpandableTrace trace={l.trace || []} />, full: true },
+                    ]} />
+                  </div>
+                </td>
+              </tr>
+            )]
+          })}
         </tbody>
       </table>
     </>
@@ -394,20 +510,37 @@ function LogPanel({ d, t }) {
 }
 
 function EventsPanel({ d, t }) {
+  const [open, toggle] = useToggleSet()
   return (
     <>
       <div className="section-title">{t('事件派发')} <span className="count">({d.events.length})</span></div>
       <table className="data-table">
         <thead><tr><th>{t('事件')}</th><th>{t('数据')}</th><th>{t('监听器')}</th><th>{t('耗时')}</th></tr></thead>
         <tbody>
-          {d.events.map((e, i) => (
-            <tr key={i}>
-              <td className="mono" style={{ fontSize: 11 }}>{e.event}</td>
-              <td className="mono" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(e.data)}>{fmtVal(e.data)}</td>
-              <td className="mono" style={{ fontSize: 11 }}>{(e.listeners || []).join(', ') || '—'}</td>
-              <td className="dur-cell">{e.duration ? e.duration.toFixed(1) + ' ms' : '—'}</td>
-            </tr>
-          ))}
+          {d.events.flatMap((e, i) => {
+            const isExp = open.has(i)
+            const main = (
+              <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => toggle(i)}>
+                <td className="mono" style={{ fontSize: 11 }}>{e.event}</td>
+                <td className="mono" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fmtVal(e.data)}>{fmtVal(e.data)}</td>
+                <td className="mono" style={{ fontSize: 11 }}>{(e.listeners || []).join(', ') || '—'}</td>
+                <td className="dur-cell">{e.duration ? e.duration.toFixed(1) + ' ms' : '—'}</td>
+              </tr>
+            )
+            if (!isExp) return [main]
+            return [main, (
+              <tr key={`d${i}`} className="detail-row">
+                <td colSpan={4}>
+                  <div className="detail-panel">
+                    <DetailFields items={[
+                      { k: t('时间'), v: fmtClock(e.time) },
+                      { k: t('完整载荷'), v: <ExpandableCode text={JSON.stringify(e.data ?? {}, null, 2)} />, full: true },
+                    ]} />
+                  </div>
+                </td>
+              </tr>
+            )]
+          })}
         </tbody>
       </table>
     </>
@@ -415,18 +548,36 @@ function EventsPanel({ d, t }) {
 }
 
 function ViewsPanel({ d, t }) {
+  const [open, toggle] = useToggleSet()
   return (
     <>
       <div className="section-title">{t('视图渲染')} <span className="count">({d.viewsData.length})</span></div>
       <table className="data-table">
         <thead><tr><th>{t('视图')}</th><th>{t('耗时')}</th></tr></thead>
         <tbody>
-          {d.viewsData.map((v, i) => (
-            <tr key={i}>
-              <td className="mono">{v.data.name}</td>
-              <td className="dur-cell">{v.duration.toFixed(1)} ms</td>
-            </tr>
-          ))}
+          {d.viewsData.flatMap((v, i) => {
+            const isExp = open.has(i)
+            const main = (
+              <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => toggle(i)}>
+                <td className="mono">{v.data.name}</td>
+                <td className="dur-cell">{v.duration.toFixed(1)} ms</td>
+              </tr>
+            )
+            if (!isExp) return [main]
+            return [main, (
+              <tr key={`d${i}`} className="detail-row">
+                <td colSpan={2}>
+                  <div className="detail-panel">
+                    <DetailFields items={[
+                      { k: t('描述'), v: v.description || '—' },
+                      { k: t('时间区间'), v: `${v.start ?? '—'} → ${v.end ?? '—'}` },
+                      { k: t('完整数据'), v: <ExpandableCode text={JSON.stringify(v.data ?? {}, null, 2)} />, full: true },
+                    ]} />
+                  </div>
+                </td>
+              </tr>
+            )]
+          })}
         </tbody>
       </table>
     </>

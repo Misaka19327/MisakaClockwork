@@ -206,6 +206,14 @@ export function fmtDateTime(unix) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, '0')}`
 }
 
+// Date + time without milliseconds — for list rows where ms precision is noise but the date still
+// matters (a time-only column loses the day for requests that span midnight).
+export function fmtDateTimeSec(unix) {
+  if (!unix) return '—'
+  const d = new Date(unix * 1000)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
 function displayUri(r) {
   if (r.type === 'command') return r.commandName ? `artisan ${r.commandName}` : 'artisan'
   if (r.type === 'queue-job') return r.jobName || 'queue-job'
@@ -262,7 +270,7 @@ export function toListRow(r) {
     status: status == null ? '—' : status,
     dur: r.responseDuration ?? 0,
     mem: r.memoryUsage ? r.memoryUsage / 1e6 : 0,
-    time: fmtClock(r.time),
+    time: fmtDateTimeSec(r.time),
     failed: requestFailed(r),
   }
 }
@@ -280,7 +288,7 @@ export function toFailureRow(f) {
     status: f.status == null ? '—' : f.status,
     dur: f.duration ?? 0,
     mem: null,
-    time: fmtClock(f.receivedAt),
+    time: fmtDateTimeSec(f.receivedAt),
     failed: true,
     failureMsg: f.title || f.rootMessage || '',
   }

@@ -140,7 +140,7 @@ export default function RequestList() {
                 <th style={{ width: 'auto' }}>URI</th>
                 <th style={{ width: 96 }}>{t('耗时')}</th>
                 <th style={{ width: 96 }}>{t('内存')}</th>
-                <th style={{ width: 100 }}>{t('时间')}</th>
+                <th style={{ width: 168 }}>{t('时间')}</th>
               </tr>
             </thead>
             <tbody ref={tbodyRef}>

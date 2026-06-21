@@ -64,3 +64,11 @@ html[data-theme="dark"] .tl-track { background: oklch(24% 0.01 250); }
 /* SQL cell */
 .data-table .sql-cell { font-family: var(--font-mono); font-size: 11px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .data-table .dur-cell { font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Click-to-expand rows (database/cache/redis/http/log/events/views). Detail rows themselves
+   are excluded from the interactive states. */
+.data-table tbody tr:not(.detail-row) { cursor: pointer; }
+.data-table tbody tr:not(.detail-row):hover { background: oklch(97% 0.006 250); }
+.data-table tbody tr.expanded:not(.detail-row) { background: oklch(96% 0.006 250); }
+html[data-theme="dark"] .data-table tbody tr:not(.detail-row):hover { background: oklch(22% 0.012 250) !important; }
+html[data-theme="dark"] .data-table tbody tr.expanded:not(.detail-row) { background: oklch(22% 0.014 250) !important; }
