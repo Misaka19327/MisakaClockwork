@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
 import { gsap, motionOk } from '../lib/motion.js'
 import { durBar, durStr, memStr } from '../lib/format.js'
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { MethodBadge, StatusBadge, TypeBadge } from '../components/Badges.jsx'
-import { api, toListRow } from '../api/clockwork.js'
+import { api, toListRow, toFailureRow } from '../api/clockwork.js'
 import './request-list.css'
 
 const TYPE_FILTERS = [
@@ -20,6 +20,10 @@ const TYPE_FILTERS = [
 export default function RequestList() {
   const { t } = useApp()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  // ?type=failed switches this page to the failures endpoint (the 失败请求 nav item), so the list
+  // matches the sidebar badge instead of just re-rendering the recent-100 list.
+  const failedMode = params.get('type') === 'failed'
   const [activeType, setActiveType] = useState('all')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState([])
@@ -34,28 +38,36 @@ export default function RequestList() {
     setLoading(true)
     setError('')
     try {
-      // GET /__clockwork/latest  +  /__clockwork/{latest.id}/previous/99  → most-recent 100 requests
-      const data = await api.recent(100)
-      setRows(data.map(toListRow))
+      if (failedMode) {
+        // GET /__clockwork/failures → failure summaries, already filtered to failed by the backend
+        // (same requestHasFailures definition the sidebar badge counts).
+        const data = await api.failures({ limit: 100 })
+        setRows((Array.isArray(data) ? data : []).map(toFailureRow))
+      } else {
+        // GET /__clockwork/latest + /__clockwork/{latest.id}/previous/99 → most-recent 100 requests
+        const data = await api.recent(100)
+        setRows(data.map(toListRow))
+      }
     } catch (e) {
       setError(e.message || String(e))
       setRows([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [failedMode])
 
   useEffect(() => { load() }, [load])
 
   const filtered = useMemo(() => {
     let r = rows
-    if (activeType !== 'all') r = r.filter(x => x.type === activeType)
+    // Type filtering is local for the recent list; the failures endpoint is already cross-type.
+    if (!failedMode && activeType !== 'all') r = r.filter(x => x.type === activeType)
     if (search.trim()) {
       const q = search.toLowerCase()
-      r = r.filter(x => x.uri.toLowerCase().includes(q) || (x.controller || '').toLowerCase().includes(q))
+      r = r.filter(x => x.uri.toLowerCase().includes(q) || (x.controller || '').toLowerCase().includes(q) || (x.failureMsg || '').toLowerCase().includes(q))
     }
     return r
-  }, [rows, activeType, search])
+  }, [rows, activeType, search, failedMode])
 
   // Stagger rows whenever the filtered set changes.
   useEffect(() => {
@@ -88,19 +100,21 @@ export default function RequestList() {
 
       <main className="main">
         <div className="topbar" ref={topbarRef}>
-          <h1>{t('请求列表')}</h1>
-          <div className="filter-group">
-            {TYPE_FILTERS.map(f => (
-              <button
-                key={f.key}
-                className={`filter-pill ${activeType === f.key ? 'active' : ''}`}
-                onClick={() => setActiveType(f.key)}
-              >
-                {f.icon && <Icon name={f.icon} size={12} />}
-                <span>{t(f.label)}</span>
-              </button>
-            ))}
-          </div>
+          <h1>{failedMode ? t('失败请求') : t('请求列表')}</h1>
+          {!failedMode && (
+            <div className="filter-group">
+              {TYPE_FILTERS.map(f => (
+                <button
+                  key={f.key}
+                  className={`filter-pill ${activeType === f.key ? 'active' : ''}`}
+                  onClick={() => setActiveType(f.key)}
+                >
+                  {f.icon && <Icon name={f.icon} size={12} />}
+                  <span>{t(f.label)}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="spacer" />
           <button className="btn-refresh" onClick={onRefresh}>
             <Icon name="refresh" size={12} style={refreshing ? { animation: 'spin 0.6s linear infinite' } : undefined} />
@@ -134,10 +148,10 @@ export default function RequestList() {
                 <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>
               )}
               {!loading && error && (
-                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载失败')}：{error}</div><div className="empty-sub">/__clockwork/latest</div></div></td></tr>
+                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载失败')}：{error}</div><div className="empty-sub">/__clockwork/{failedMode ? 'failures' : 'latest'}</div></div></td></tr>
               )}
               {!loading && !error && filtered.length === 0 && (
-                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('暂无请求')}</div></div></td></tr>
+                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{failedMode ? t('暂无失败请求') : t('暂无请求')}</div></div></td></tr>
               )}
               {!loading && !error && filtered.map(r => {
                 const { cls, widthPx } = durBar(r.dur)
@@ -148,10 +162,10 @@ export default function RequestList() {
                     className={r.failed ? 'row-failed' : ''}
                     onClick={() => navigate(`/requests/${r.id}`)}
                   >
-                    <td>{r.failed && <span className="fail-dot" />}<StatusBadge status={r.status} /></td>
+                    <td>{r.failed && <span className="fail-dot" />}<StatusBadge status={r.status} exit={r.type === 'command'} /></td>
                     <td><TypeBadge type={r.type} size={11} /></td>
                     <td className="cell-method">{r.method}</td>
-                    <td className="cell-uri" title={r.uri}>{r.uri}</td>
+                    <td className="cell-uri" title={r.failureMsg || r.uri}>{r.uri}</td>
                     <td className={`cell-dur${slow ? ' slow' : ''}`}>
                       <span className={`dur-bar ${cls}`} style={{ width: widthPx }}>&nbsp;</span>{durStr(r.dur)}
                     </td>

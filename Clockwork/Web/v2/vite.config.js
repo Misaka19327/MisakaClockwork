@@ -10,7 +10,12 @@ export default defineConfig({
   base: './',
   build: {
     outDir: '../public/v2',
-    emptyOutDir: true
+    // Don't rmSync outDir before writing: on Windows the PHP dev server / browser often holds the
+    // previous build's assets open, making emptyDir fail with EPERM. Vite still overwrites index.html
+    // and emits fresh-hashed JS; the CSS keeps a stable hash so it's overwritten in place. Stale
+    // old-hash JS files accumulate harmlessly (index.html only ever references the latest). Flip to
+    // true only when nothing is locking assets and you want a clean slate.
+    emptyOutDir: false
   },
   server: {
     port: 5173,

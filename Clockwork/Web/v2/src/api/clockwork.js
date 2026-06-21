@@ -219,12 +219,40 @@ function deriveFailure(r) {
     const frame = errLog.trace && errLog.trace[0]
     return frame ? `${errLog.message} — ${frame.file}:${frame.line}` : errLog.message
   }
-  return `HTTP ${r.responseStatus} on ${r.uri || r.url || ''}`
+  if (r.type === 'command') return `Command exited ${r.commandExitCode}`
+  if (r.type === 'queue-job') return `Queue job ${r.jobStatus || 'failed'}: ${r.jobName || r.jobDescription || ''}`
+  if (r.type === 'test') return `Test ${r.testStatus || 'failed'}: ${r.testName || ''}`
+  return `HTTP ${requestStatus(r) ?? '—'} on ${r.uri || r.url || ''}`
+}
+
+// Status for a request, mirroring Clockwork\Support\Laravel\ClockworkSupport::requestStatus —
+// non-HTTP types carry their status in a different field (command exit code, job/test status).
+export function requestStatus(r) {
+  if (r.type === 'command') return r.commandExitCode
+  if (r.type === 'queue-job') return r.jobStatus
+  if (r.type === 'test') return r.testStatus
+  return r.responseStatus
+}
+
+// Whether a request is failed, mirroring requestHasFailures / getErrorInformation: type-specific
+// status failure (HTTP >=400, non-zero command exit, failed job, non-passed test) OR an
+// error-level log entry.
+export function requestFailed(r) {
+  if (r.type === 'command') {
+    if (r.commandExitCode != null && r.commandExitCode !== 0) return true
+  } else if (r.type === 'queue-job') {
+    if (r.jobStatus === 'failed') return true
+  } else if (r.type === 'test') {
+    if (r.testStatus && r.testStatus !== 'passed') return true
+  } else {
+    if (r.responseStatus != null && r.responseStatus >= 400) return true
+  }
+  return (r.log || []).some(l => ERROR_LEVELS.has(l.level))
 }
 
 // Request list row shape (matches what RequestList.jsx renders).
 export function toListRow(r) {
-  const status = r.responseStatus
+  const status = requestStatus(r)
   return {
     id: r.id,
     type: r.type,
@@ -235,7 +263,26 @@ export function toListRow(r) {
     dur: r.responseDuration ?? 0,
     mem: r.memoryUsage ? r.memoryUsage / 1e6 : 0,
     time: fmtClock(r.time),
-    failed: status != null && status >= 500,
+    failed: requestFailed(r),
+  }
+}
+
+// Failure-list row shape: maps a /__clockwork/failures summary onto the row RequestList renders.
+// The failures endpoint returns a different shape than a full request (no method/memory/controller),
+// so those render as "—". Every row here is a failure by definition.
+export function toFailureRow(f) {
+  return {
+    id: f.id,
+    type: f.type,
+    method: '—',
+    uri: f.name || '',
+    controller: '',
+    status: f.status == null ? '—' : f.status,
+    dur: f.duration ?? 0,
+    mem: null,
+    time: fmtClock(f.receivedAt),
+    failed: true,
+    failureMsg: f.title || f.rootMessage || '',
   }
 }
 
@@ -246,7 +293,7 @@ export function toListRow(r) {
 //   cacheReads/Hits/Writes/Deletes/Time → cacheStats.{reads,hits,...},
 //   log → logs, headers (arrays joined to strings), time → timeStr.
 export function toDetail(r) {
-  const status = r.responseStatus
+  const status = requestStatus(r)
   return {
     id: r.id,
     uuid: r.uuid,
@@ -259,7 +306,7 @@ export function toDetail(r) {
     memory: r.memoryUsage ?? 0,
     time: r.time,
     timeStr: fmtDateTime(r.time),
-    failed: (status != null && status >= 500) || (r.log || []).some(l => ERROR_LEVELS.has(l.level)),
+    failed: requestFailed(r),
     failureMsg: deriveFailure(r),
     getData: r.getData || {},
     postData: r.postData || {},
