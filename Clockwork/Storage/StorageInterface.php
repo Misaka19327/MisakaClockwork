@@ -11,9 +11,6 @@ interface StorageInterface
     // Return a single request by id
     public function find($id);
 
-    // Return a single request by uuid
-    public function findByUuid($uuid);
-
     // Return the latest request
     public function latest(?Search $search = null);
 
@@ -29,6 +26,6 @@ interface StorageInterface
     // Update existing request
     public function update(Request $request);
 
-    // Cleanup old requests
-    public function cleanup();
+    // Cleanup old requests; when $force is true, override retention and clear everything
+    public function cleanup($force = false);
 }
