@@ -8,9 +8,6 @@ class Request
     // Unique request ID
     public $id;
 
-    // Unique request UUID
-    public $uuid;
-
     // Metadata version
     public $version = 1;
 
@@ -222,7 +219,6 @@ class Request
     public function __construct(array $data = [])
     {
         $this->id = $data['id'] ?? $this->generateRequestId();
-        $this->uuid = $data['uuid'] ?? $this->generateUuid();
         $this->time = microtime(true);
         $this->updateToken = $data['updateToken'] ?? $this->generateUpdateToken();
 
@@ -237,18 +233,6 @@ class Request
     protected function generateRequestId()
     {
         return str_replace('.', '-', sprintf('%.4F', microtime(true))) . '-' . mt_rand();
-    }
-
-    // Get all request data as a JSON string
-
-    protected function generateUuid()
-    {
-        $bytes = function_exists('random_bytes') ? random_bytes(16) : openssl_random_pseudo_bytes(16);
-
-        $bytes[6] = chr(ord($bytes[6]) & 0x0f | 0x40);
-        $bytes[8] = chr(ord($bytes[8]) & 0x3f | 0x80);
-
-        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
     }
 
     // Return request data except specified keys as an array
@@ -274,7 +258,6 @@ class Request
     {
         return [
             'id' => $this->id,
-            'uuid' => $this->uuid,
             'version' => $this->version,
             'type' => $this->type,
             'time' => $this->time,
@@ -368,7 +351,7 @@ class Request
     protected function databaseQueriesWithContext()
     {
         return array_map(function ($query) {
-            $query = $this->withRequestUuid($query);
+            $query = $this->withRequestId($query);
             $query = $this->withDefaultField($query, 'result', null);
             $query = $this->withDefaultField($query, 'resultAvailable', $this->hasField($query, 'result') && $this->field($query, 'result') !== null);
             return $this->withDefaultField(
@@ -383,12 +366,12 @@ class Request
     // executed), query, duration (in ms), connection (connection name), trace (serialized trace), file (caller file
     // name), line (caller line number), tags
 
-    protected function withRequestUuid($value)
+    protected function withRequestId($value)
     {
         if (is_array($value)) {
-            $value['requestUuid'] = $value['requestUuid'] ?? $this->uuid;
+            $value['requestId'] = $value['requestId'] ?? $this->id;
         } elseif (is_object($value)) {
-            $value->requestUuid = $value->requestUuid ?? $this->uuid;
+            $value->requestId = $value->requestId ?? $this->id;
         }
 
         return $value;
@@ -502,7 +485,7 @@ class Request
     protected function cacheQueriesWithContext()
     {
         return array_map(function ($query) {
-            $query = $this->withRequestUuid($query);
+            $query = $this->withRequestId($query);
             $query = $this->withDefaultField($query, 'result', $this->field($query, 'value'));
             $query = $this->withDefaultField($query, 'resultAvailable', $this->field($query, 'result') !== null);
             return $this->withDefaultField(
@@ -579,7 +562,7 @@ class Request
     protected function redisCommandsWithContext()
     {
         return array_map(function ($command) {
-            $command = $this->withRequestUuid($command);
+            $command = $this->withRequestId($command);
             $parameters = $this->field($command, 'parameters') ?: [];
             $command = $this->withDefaultField($command, 'key', $parameters[0] ?? null);
             $command = $this->withDefaultField($command, 'result', null);
@@ -605,7 +588,7 @@ class Request
     protected function httpRequestsWithContext()
     {
         return array_map(function ($request) {
-            $request = $this->withRequestUuid($request);
+            $request = $this->withRequestId($request);
             $request = $this->withDefaultField($request, 'result', $this->field($request, 'response'));
             $request = $this->withDefaultField($request, 'resultAvailable', $this->field($request, 'response') !== null);
             return $this->withDefaultField(
@@ -623,12 +606,107 @@ class Request
         }, ARRAY_FILTER_USE_BOTH);
     }
 
+    // Yield the 7 operation-category rows that the storage layer persists independently in the
+    // operations table. Each yielded row is [category, sub_type, time, duration, seq, data]; the
+    // storage layer stamps request_id when inserting. modelsActions is intentionally not yielded
+    // (it stays on the request row — its count accessors depend on the in-memory list).
+    public function toOperations()
+    {
+        $seq = 0;
+
+        foreach ($this->databaseQueriesWithContext() as $query) {
+            yield $this->operationStorageRow('database', $query, $seq++, [
+                'sub_type' => $this->inferQueryType($query['query'] ?? null),
+            ]);
+        }
+
+        foreach ($this->cacheQueriesWithContext() as $query) {
+            yield $this->operationStorageRow('cache', $query, $seq++, [
+                'sub_type' => $query['type'] ?? null,
+            ]);
+        }
+
+        foreach ($this->redisCommandsWithContext() as $command) {
+            yield $this->operationStorageRow('redis', $command, $seq++, [
+                'sub_type' => $command['command'] ?? null,
+            ]);
+        }
+
+        foreach ($this->log()->toArray() as $entry) {
+            yield $this->operationStorageRow('log', $entry, $seq++, [
+                'sub_type' => $entry['level'] ?? null,
+                'duration' => null, // log entries are point-in-time events with no duration
+            ]);
+        }
+
+        foreach ((array) $this->events as $event) {
+            yield $this->operationStorageRow('events', $event, $seq++);
+        }
+
+        foreach ((array) $this->viewsData as $view) {
+            yield $this->operationStorageRow('views', $view, $seq++, [
+                'time' => $view['start'] ?? null, // views use a start/end interval, not a point time
+            ]);
+        }
+
+        foreach ((array) $this->notifications as $notification) {
+            yield $this->operationStorageRow('notifications', $notification, $seq++);
+        }
+
+        // Legacy emailsData (older Swift-based emails) folds into the notifications category,
+        // tagged with _source so the read path can split it back out — mirrors the historical
+        // folding done at display time in ClockworkSupport.
+        foreach ((array) ($this->emailsData ?: []) as $email) {
+            $data = (is_array($email) && isset($email['data']) && is_array($email['data'])) ? $email['data'] : [];
+
+            yield $this->operationStorageRow('notifications', [
+                'subject'     => $data['subject'] ?? null,
+                'to'          => $data['to'] ?? null,
+                'from'        => $data['from'] ?? null,
+                'type'        => 'mail',
+                'duration'    => $email['duration'] ?? null,
+                'time'        => $email['start'] ?? null,
+                'description' => $email['description'] ?? 'Sending an email message',
+                '_source'     => 'emailsData',
+            ], $seq++);
+        }
+    }
+
+    // Build one operations-table row from an operation record. time defaults to the record's own
+    // time (or start), duration to the record's duration; $overrides can force either (e.g. log
+    // duration null, views time from start).
+    protected function operationStorageRow($category, $op, $seq, array $overrides = [])
+    {
+        $op = is_array($op) ? $op : (array) $op;
+
+        return [
+            'category' => $category,
+            'sub_type' => $overrides['sub_type'] ?? null,
+            'time'     => $overrides['time'] ?? $op['time'] ?? $op['start'] ?? null,
+            'duration' => array_key_exists('duration', $overrides) ? $overrides['duration'] : ($op['duration'] ?? null),
+            'seq'      => $seq,
+            'data'     => $op,
+        ];
+    }
+
+    // Infer a coarse SQL type from the leading verb (real query records carry no explicit type).
+    protected function inferQueryType($sql)
+    {
+        $sql = ltrim((string) $sql);
+        if (preg_match('/^select\b/i', $sql)) return 'select';
+        if (preg_match('/^insert\b/i', $sql)) return 'insert';
+        if (preg_match('/^update\b/i', $sql)) return 'update';
+        if (preg_match('/^(delete|truncate)\b/i', $sql)) return 'delete';
+
+        return 'other';
+    }
+
     public function addDatabaseQuery($query, $bindings = [], $duration = null, $data = [])
     {
         $resultAvailable = array_key_exists('result', $data);
 
         $this->databaseQueries[] = [
-            'requestUuid' => $this->uuid,
+            'requestId' => $this->id,
             'query' => $query,
             'bindings' => (new Serializer)->normalize($bindings),
             'duration' => $duration,
@@ -650,7 +728,7 @@ class Request
     public function addModelAction($model, $action, $data = [])
     {
         $this->modelsActions[] = [
-            'requestUuid' => $this->uuid,
+            'requestId' => $this->id,
             'model' => $model,
             'key' => $data['key'] ?? null,
             'action' => $action,
@@ -675,7 +753,7 @@ class Request
         $result = array_key_exists('result', $data) ? $data['result'] : $value;
 
         $this->cacheQueries[] = [
-            'requestUuid' => $this->uuid,
+            'requestId' => $this->id,
             'type' => $type,
             'key' => $key,
             'value' => (new Serializer)->normalize($value),
@@ -805,7 +883,6 @@ class Request
     {
         $this->parent = [
             'id' => $id,
-            'uuid' => $data['uuid'] ?? null,
             'url' => $data['url'] ?? null,
             'path' => $data['path'] ?? null
         ];
@@ -844,7 +921,6 @@ class Request
             'summary' => $this->toFailureSummary(),
             'primaryError' => $this->getPrimaryError(),
             'topAppFrames' => $this->getTopAppFrames(),
-            'uuid' => $this->uuid,
             'id' => $this->id,
             'type' => $this->type,
             'time' => $this->time,
