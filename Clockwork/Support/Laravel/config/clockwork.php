@@ -298,19 +298,12 @@ return [
     | Metadata storage
     |------------------------------------------------------------------------------------------------------------------
     |
-    | Configure how is the metadata collected by Clockwork stored. Three options are available:
-    |   - files - A simple fast storage implementation storing data in one-per-request files.
-    |   - sql - Stores requests in a sql database. Supports MySQL, PostgreSQL and SQLite. Requires PDO.
-    |   - redis - Stores requests in redis. Requires phpredis.
+    | Configure how is the metadata collected by Clockwork stored. Two options are available:
+    |   - sql - Stores requests (and operations, as first-class rows) in a sql database. Supports MySQL, PostgreSQL and SQLite. Requires PDO.
+    |   - redis - Stores requests in redis. Requires phpredis. (The operations center is SQL-only.)
     */
 
-    'storage' => env('CLOCKWORK_STORAGE', 'files'),
-
-    // Path where the Clockwork metadata is stored
-    'storage_files_path' => env('CLOCKWORK_STORAGE_FILES_PATH', storage_path('clockwork')),
-
-    // Compress the metadata files using gzip, trading a little bit of performance for lower disk usage
-    'storage_files_compress' => env('CLOCKWORK_STORAGE_FILES_COMPRESS', false),
+    'storage' => env('CLOCKWORK_STORAGE', 'sql'),
 
     // SQL database to use, can be a name of database configured in database.php or a path to a SQLite file
     'storage_sql_database' => env('CLOCKWORK_STORAGE_SQL_DATABASE', storage_path('clockwork.sqlite')),
@@ -318,14 +311,20 @@ return [
     // SQL table name to use, the table is automatically created and updated when needed
     'storage_sql_table' => env('CLOCKWORK_STORAGE_SQL_TABLE', 'clockwork'),
 
+    // SQL table storing operations as first-class rows (powers the operation-centric center)
+    'storage_sql_operations_table' => env('CLOCKWORK_STORAGE_SQL_OPERATIONS_TABLE', 'clockwork_operations'),
+
     // Redis connection, name of redis connection or cluster configured in database.php
     'storage_redis' => env('CLOCKWORK_STORAGE_REDIS', 'default'),
 
     // Redis prefix for Clockwork keys ("clockwork" if not set)
     'storage_redis_prefix' => env('CLOCKWORK_STORAGE_REDIS_PREFIX', 'clockwork'),
 
-    // Maximum lifetime of collected metadata in minutes, older requests will automatically be deleted, false to disable
-    'storage_expiration' => env('CLOCKWORK_STORAGE_EXPIRATION', 60 * 24 * 7),
+    // Automatically delete requests and operations older than this many hours (0 keeps nothing; runs on each store)
+    'storage_retention_hours' => env('CLOCKWORK_STORAGE_RETENTION_HOURS', 168),
+
+    // Run automatic cleanup after each store; set to false to only clean via clockwork:clean
+    'storage_cleanup_enabled' => env('CLOCKWORK_STORAGE_CLEANUP_ENABLED', true),
 
     /*
     |------------------------------------------------------------------------------------------------------------------

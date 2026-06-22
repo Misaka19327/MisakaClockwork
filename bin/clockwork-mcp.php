@@ -20,7 +20,6 @@ if (is_file($autoloadPath)) {
 
 use Clockwork\Clockwork;
 use Clockwork\Request\Request;
-use Clockwork\Storage\FileStorage;
 use Clockwork\Storage\Search;
 use Clockwork\Storage\SqlStorage;
 
@@ -60,69 +59,26 @@ class ClockworkMcpServer
     {
         $dsn = getenv('CLOCKWORK_MCP_STORAGE_DSN');
 
-        if ($dsn) {
-            $this->storageMeta = [
-                'available' => true,
-                'driver' => 'sql',
-                'dsn' => $dsn,
-                'table' => getenv('CLOCKWORK_MCP_STORAGE_SQL_TABLE') ?: 'clockwork'
-            ];
-
-            return new SqlStorage(
-                $dsn,
-                $this->storageMeta['table'],
-                getenv('CLOCKWORK_MCP_STORAGE_SQL_USERNAME') ?: null,
-                getenv('CLOCKWORK_MCP_STORAGE_SQL_PASSWORD') ?: null,
-                false
-            );
-        }
-
-        $path = $this->resolveStoragePath();
-
-        if (!is_dir($path)) {
-            throw new \RuntimeException("Clockwork storage path does not exist: {$path}");
+        if (!$dsn) {
+            throw new \RuntimeException('CLOCKWORK_MCP_STORAGE_DSN environment variable is required (e.g. sqlite:/path/to/clockwork.sqlite).');
         }
 
         $this->storageMeta = [
             'available' => true,
-            'driver' => 'files',
-            'path' => $path
+            'driver' => 'sql',
+            'dsn' => $dsn,
+            'table' => getenv('CLOCKWORK_MCP_STORAGE_SQL_TABLE') ?: 'clockwork'
         ];
 
-        return new FileStorage($path);
-    }
-
-    private function resolveStoragePath()
-    {
-        $configured = getenv('CLOCKWORK_MCP_STORAGE_PATH');
-
-        if ($configured) {
-            return $this->normalizePath($configured);
-        }
-
-        $candidates = [
-            $this->rootPath . '/storage/clockwork',
-            $this->rootPath . '/tmp_clockwork_storage'
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (is_dir($candidate)) return $candidate;
-        }
-
-        return $candidates[0];
-    }
-
-    private function normalizePath($path)
-    {
-        if ($path === '') return $path;
-
-        $path = str_replace('\\', '/', $path);
-
-        if (preg_match('/^(?:[A-Za-z]:\/|\/)/', $path)) {
-            return $path;
-        }
-
-        return $this->rootPath . '/' . ltrim($path, '/');
+        return new SqlStorage(
+            $dsn,
+            $this->storageMeta['table'],
+            getenv('CLOCKWORK_MCP_STORAGE_SQL_USERNAME') ?: null,
+            getenv('CLOCKWORK_MCP_STORAGE_SQL_PASSWORD') ?: null,
+            getenv('CLOCKWORK_MCP_STORAGE_SQL_OPERATIONS_TABLE') ?: 'clockwork_operations',
+            null,
+            false
+        );
     }
 
     public function run()
@@ -355,17 +311,13 @@ class ClockworkMcpServer
             ],
             [
                 'name' => 'clockwork_get_request',
-                'description' => 'Fetch a single Clockwork request by id or uuid.',
+                'description' => 'Fetch a single Clockwork request by id.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
                         'id' => [
                             'type' => 'string',
                             'description' => 'Clockwork request id.'
-                        ],
-                        'uuid' => [
-                            'type' => 'string',
-                            'description' => 'Clockwork request uuid.'
                         ],
                         'view' => [
                             'type' => 'string',
@@ -377,17 +329,13 @@ class ClockworkMcpServer
             ],
             [
                 'name' => 'clockwork_get_event_details',
-                'description' => 'Return the event-details payload for a request by id or uuid.',
+                'description' => 'Return the event-details payload for a request by id.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
                         'id' => [
                             'type' => 'string',
                             'description' => 'Clockwork request id.'
-                        ],
-                        'uuid' => [
-                            'type' => 'string',
-                            'description' => 'Clockwork request uuid.'
                         ]
                     ]
                 ]
@@ -459,7 +407,6 @@ class ClockworkMcpServer
     {
         return [
             'id' => $request->id,
-            'uuid' => $request->uuid,
             'type' => $request->type,
             'time' => $request->time,
             'method' => $request->method,
@@ -593,15 +540,12 @@ class ClockworkMcpServer
     private function requireRequest(array $arguments)
     {
         $id = isset($arguments['id']) ? trim((string)$arguments['id']) : '';
-        $uuid = isset($arguments['uuid']) ? trim((string)$arguments['uuid']) : '';
 
-        if ($id === '' && $uuid === '') {
-            throw new \InvalidArgumentException('Provide either id or uuid.');
+        if ($id === '') {
+            throw new \InvalidArgumentException('Provide a request id.');
         }
 
-        $request = $id !== ''
-            ? $this->storage->find($id)
-            : $this->storage->findByUuid($uuid);
+        $request = $this->storage->find($id);
 
         if (!$request) {
             throw new \InvalidArgumentException('Clockwork request not found.');

@@ -22,7 +22,8 @@ class ClockworkCleanCommand extends Command
     {
         return [
             ['all', 'a', InputOption::VALUE_NONE, 'cleans all data'],
-            ['expiration', 'e', InputOption::VALUE_REQUIRED, 'cleans data older than specified value in minutes']
+            ['hours', null, InputOption::VALUE_REQUIRED, 'cleans data older than the specified number of hours'],
+            ['expiration', 'e', InputOption::VALUE_REQUIRED, 'deprecated alias for --hours, value in minutes']
         ];
     }
 
@@ -38,12 +39,15 @@ class ClockworkCleanCommand extends Command
     public function handle()
     {
         if ($this->option('all')) {
-            $this->laravel['config']->set('clockwork.storage_expiration', 0);
+            $this->laravel['config']->set('clockwork.storage_retention_hours', 0);
+        } elseif (($hours = $this->option('hours')) !== null) {
+            $this->laravel['config']->set('clockwork.storage_retention_hours', (float) $hours);
         } elseif ($expiration = $this->option('expiration')) {
-            $this->laravel['config']->set('clockwork.storage_expiration', $expiration);
+            // deprecated minutes-based alias, convert up to whole hours
+            $this->laravel['config']->set('clockwork.storage_retention_hours', ceil(((float) $expiration) / 60));
         }
 
-        $this->laravel['clockwork.support']->makeStorage()->cleanup($force = true);
+        $this->laravel['clockwork.support']->makeStorage()->cleanup(true);
 
         $this->info('Metadata cleaned successfully.');
     }
