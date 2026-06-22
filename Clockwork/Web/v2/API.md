@@ -1,7 +1,7 @@
 # Clockwork HTTP API (`/__clockwork/*`)
 
 The React v2 app talks to the Clockwork backend over these endpoints, registered by
-`Clockwork\Support\Laravel\ClockworkController` (and the Symfony/Lumen equivalents). All
+`Clockwork\Support\Laravel\ClockworkController`. All
 paths are rooted at `/__clockwork`. The app calls them with **relative** URLs (`/__clockwork/…`),
 so they resolve same-origin in production and are proxied to the Laravel app in dev
 (see `vite.config.js` → `server.proxy`).

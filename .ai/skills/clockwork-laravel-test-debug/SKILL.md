@@ -1,6 +1,6 @@
 ---
 name: clockwork-laravel-test-debug
-description: Use when Codex needs to debug a Laravel test or local non-production environment that exposes this Clockwork fork. Prefer this skill when the app provides the agent-oriented Clockwork endpoints `/__clockwork/failures`, `/__clockwork/events/details/{uuid}`, and `/__clockwork/env`, and Codex needs to inspect recent failures, retrieve full event context by UUID, or snapshot the Laravel debug environment before changing code.
+description: Use when Codex needs to debug a Laravel test or local non-production environment that exposes this Clockwork fork. Prefer this skill when the app provides the agent-oriented Clockwork endpoints `/__clockwork/failures`, `/__clockwork/events/details/{id}`, and `/__clockwork/env`, and Codex needs to inspect recent failures, retrieve full event context by request id, or snapshot the Laravel debug environment before changing code.
 ---
 
 # Clockwork Laravel Test Debug
@@ -11,7 +11,7 @@ Use the Clockwork Laravel endpoints as the first read path for test-environment 
 
 1. Fetch `GET /__clockwork/failures` first.
 2. Pick the most relevant failure by `type`, `status`, `title`, `rootMessage`, and `topAppFrame`.
-3. Fetch `GET /__clockwork/events/details/{uuid}` for the chosen failure.
+3. Fetch `GET /__clockwork/events/details/{id}` for the chosen failure, using its `id` from the failures list.
 4. Read `summary`, `primaryError`, and `topAppFrames` before scanning `raw`.
 5. Fetch `GET /__clockwork/env` when the failure may depend on environment, storage driver, queue mode, or collection
    settings.
@@ -28,7 +28,7 @@ Supported query parameters:
 - `since`
 - `search`
 
-Use `GET /__clockwork/events/details/{uuid}` for the full debugging payload for one event.
+Use `GET /__clockwork/events/details/{id}` for the full debugging payload for one event.
 
 Prioritize these fields:
 
@@ -57,7 +57,7 @@ Prioritize these fields:
 
 ## Operating Rules
 
-Prefer `/__clockwork/events/details/{uuid}` over the legacy `/__clockwork/uuid/{uuid}/details` path for new agent logic.
+Use `/__clockwork/events/details/{id}` (the request `id` from the failures list) for new agent logic. The legacy `/uuid/{uuid}/details` path has been removed.
 
 Treat these endpoints as read-only evidence sources. Do not infer missing business state from them alone.
 

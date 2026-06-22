@@ -23,6 +23,10 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Whether automatic cleanup runs after each store
     protected $cleanupEnabled;
 
+    // Whether the operations table has been confirmed to exist (avoids repeated CREATE IF NOT
+    // EXISTS calls)
+    protected $operationsTableExists = false;
+
     // Schema for the Clockwork requests table — operation arrays are NOT stored here (they live
     // in the operations table); only the header, non-operation context, and denormalized counts
     // (which keep getStats cheap) remain.
@@ -211,7 +215,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
             $this->storeOnce($request);
         }
 
-        $this->cleanup();
+        if ($this->cleanupEnabled) $this->cleanup();
     }
 
     // Update an existing request and replace its operations atomically.
@@ -224,11 +228,12 @@ class SqlStorage extends Storage implements OperationsStorageInterface
             $this->updateOnce($request);
         }
 
-        $this->cleanup();
+        if ($this->cleanupEnabled) $this->cleanup();
     }
 
     // Cleanup old requests and their operations. $force (or a zero retention window) clears
-    // everything; otherwise rows older than the retention window are removed.
+    // everything; otherwise rows older than the retention window are removed. This always runs
+    // when called — the cleanupEnabled flag only gates the automatic cleanup after store/update.
     public function cleanup($force = false)
     {
         if ($force || $this->retentionHours === 0) {
@@ -236,8 +241,6 @@ class SqlStorage extends Storage implements OperationsStorageInterface
             $this->query("DELETE FROM {$this->table}");
             return;
         }
-
-        if (!$this->cleanupEnabled) return;
 
         $cutoff = time() - ($this->retentionHours * 3600);
         $this->query("DELETE FROM {$this->operationsTable} WHERE time < :time", ['time' => $cutoff]);
@@ -249,6 +252,8 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Flat operation rows for a category, each carrying an originating-request back-reference.
     public function operations($category, ?Search $search = null, $limit = null)
     {
+        $this->ensureOperationsTable();
+
         $limit = $limit !== null ? max(1, (int)$limit) : null;
 
         $requestIds = $this->searchRequestIds($search);
@@ -287,6 +292,8 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Single-category KPIs, shape aligned with the former ClockworkSupport::buildOperationsKpis.
     public function operationStats($category, ?Search $search = null)
     {
+        $this->ensureOperationsTable();
+
         $requestIds = $this->searchRequestIds($search);
         if ($requestIds === []) return $this->emptyOperationStats($category);
 
@@ -406,6 +413,8 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // be reproduced in a query), so the result is tagged with failureRateMode.
     public function overviewStats(?Search $search = null)
     {
+        $this->ensureOperationsTable();
+
         $search = SqlSearch::fromBase($search, $this->pdo);
         $where = $search->query; // '' or 'WHERE ...'
         $bindings = $search->bindings;
@@ -620,6 +629,8 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Perform a single request store within a transaction.
     protected function storeOnce(Request $request)
     {
+        $this->ensureOperationsTable();
+
         $data = $request->toArray();
 
         foreach ($this->needsSerialization as $key) {
@@ -657,6 +668,8 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Update a request and replace its operations within a transaction.
     protected function updateOnce(Request $request)
     {
+        $this->ensureOperationsTable();
+
         $data = $request->toArray();
 
         foreach ($this->needsSerialization as $key) {
@@ -749,6 +762,8 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     protected function fetchOperationsForRequests(array $ids)
     {
         if (!count($ids)) return [];
+
+        $this->ensureOperationsTable();
         [$placeholder, $bindings] = $this->inClause($ids);
         $stmt = $this->query(
             "SELECT request_id, category, seq, data FROM {$this->operationsTable}"
@@ -812,12 +827,35 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         $indexName = $this->quote("{$this->table}_time_index");
         $this->pdo->exec("CREATE INDEX {$indexName} ON {$table} (" . $this->quote('time') . ')');
 
-        // operations table + its indexes
+        // operations table + its indexes (non-destructive create-if-not-exists, shared with
+        // ensureOperationsTable so initialize() never fails if the table was already ensured)
+        $this->ensureOperationsTable();
+    }
+
+    // Non-destructively make sure the operations table exists (CREATE TABLE IF NOT EXISTS). Called
+    // on the operations read/write paths so a missing operations table — e.g. when upgrading from
+    // an old schema that only had the requests table — is created in place, instead of letting the
+    // generic query()'s lazy initialize() fire and rename the data-bearing requests table away.
+    protected function ensureOperationsTable()
+    {
+        if ($this->operationsTableExists) return;
+
         $operationsTable = $this->quote($this->operationsTable);
-        $this->pdo->exec($this->buildOperationsSchema($operationsTable));
-        $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->operationsTable}_category_time_index") . " ON {$operationsTable} (" . $this->quote('category') . ', ' . $this->quote('time') . ')');
-        $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->operationsTable}_request_index") . " ON {$operationsTable} (" . $this->quote('request_id') . ')');
-        $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->operationsTable}_time_index") . " ON {$operationsTable} (" . $this->quote('time') . ')');
+        $this->pdo->exec($this->buildOperationsSchema($operationsTable, true));
+
+        foreach ([
+            ["{$this->operationsTable}_category_time_index", [$this->quote('category'), $this->quote('time')]],
+            ["{$this->operationsTable}_request_index",       [$this->quote('request_id')]],
+            ["{$this->operationsTable}_time_index",          [$this->quote('time')]],
+        ] as [$indexName, $columns]) {
+            try {
+                $this->pdo->exec("CREATE INDEX IF NOT EXISTS " . $this->quote($indexName) . " ON {$operationsTable} (" . implode(', ', $columns) . ")");
+            } catch (\PDOException $e) {
+                // mysql doesn't support IF NOT EXISTS on CREATE INDEX; ignore duplicate-name errors
+            }
+        }
+
+        $this->operationsTableExists = true;
     }
 
     // Builds the query to create the requests table
@@ -833,11 +871,11 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     }
 
     // Builds the query to create the operations table
-    protected function buildOperationsSchema($table)
+    protected function buildOperationsSchema($table, $ifNotExists = false)
     {
         $textType = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) == 'mysql' ? 'MEDIUMTEXT' : 'TEXT';
 
-        return "CREATE TABLE {$table} ("
+        return "CREATE TABLE" . ($ifNotExists ? " IF NOT EXISTS" : "") . " {$table} ("
             . $this->quote('id') . ' ' . $this->primaryKeyStrategy() . ', '
             . $this->quote('request_id') . ' VARCHAR(100) NOT NULL, '
             . $this->quote('category') . ' VARCHAR(50) NOT NULL, '

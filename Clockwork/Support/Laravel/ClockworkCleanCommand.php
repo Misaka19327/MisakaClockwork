@@ -39,15 +39,20 @@ class ClockworkCleanCommand extends Command
     public function handle()
     {
         if ($this->option('all')) {
-            $this->laravel['config']->set('clockwork.storage_retention_hours', 0);
-        } elseif (($hours = $this->option('hours')) !== null) {
-            $this->laravel['config']->set('clockwork.storage_retention_hours', (float) $hours);
-        } elseif ($expiration = $this->option('expiration')) {
-            // deprecated minutes-based alias, convert up to whole hours
-            $this->laravel['config']->set('clockwork.storage_retention_hours', ceil(((float) $expiration) / 60));
-        }
+            // --all force-truncates both tables regardless of retention
+            $this->laravel['clockwork.support']->makeStorage()->cleanup(true);
+        } else {
+            // --hours / --expiration (or no arg) narrow the retention window, then run a normal
+            // time-based cleanup. They must NOT force-truncate (that was a regression).
+            if (($hours = $this->option('hours')) !== null) {
+                $this->laravel['config']->set('clockwork.storage_retention_hours', (float) $hours);
+            } elseif ($expiration = $this->option('expiration')) {
+                // deprecated minutes-based alias, convert up to whole hours
+                $this->laravel['config']->set('clockwork.storage_retention_hours', ceil(((float) $expiration) / 60));
+            }
 
-        $this->laravel['clockwork.support']->makeStorage()->cleanup(true);
+            $this->laravel['clockwork.support']->makeStorage()->cleanup(false);
+        }
 
         $this->info('Metadata cleaned successfully.');
     }
