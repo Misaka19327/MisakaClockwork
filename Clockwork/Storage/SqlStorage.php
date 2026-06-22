@@ -120,6 +120,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     public function __construct($dsn, $table = 'clockwork', $username = null, $password = null, $operationsTable = 'clockwork_operations', $retentionHours = null, $cleanupEnabled = true)
     {
         $this->pdo = $dsn instanceof PDO ? $dsn : new PDO($dsn, $username, $password);
+        $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
         $this->table = $table;
         $this->operationsTable = $operationsTable;
         $this->retentionHours = $retentionHours === null ? 168 : $retentionHours;
@@ -206,7 +207,9 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         try {
             $this->storeOnce($request);
         } catch (\PDOException $e) {
-            // assume a missing or out-of-date schema, (re)create both tables and retry once
+            // only reinitialize on a missing/out-of-date schema; rethrow anything else so a
+            // runtime error doesn't DROP the tables and wipe the collected data
+            if (!$this->isSchemaError($e)) throw $e;
             $this->initialize();
             $this->storeOnce($request);
         }
@@ -220,6 +223,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         try {
             $this->updateOnce($request);
         } catch (\PDOException $e) {
+            if (!$this->isSchemaError($e)) throw $e;
             $this->initialize();
             $this->updateOnce($request);
         }
@@ -860,23 +864,38 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         return $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) == 'mysql' ? "`{$identifier}`" : "\"{$identifier}\"";
     }
 
-    // Executes an sql query, lazily initiates the clockwork database schema if it's old or doesn't
-    // exist yet, returns executed statement or false on error
+    // Executes an sql query. On a missing-table / missing-column error it lazily bootstraps the
+    // schema (initialize()) and retries once; any other failure (malformed SQL, integrity
+    // violation, lock, connection) is rethrown — it must never trigger initialize(), which DROPs
+    // the tables and would wipe the collected data. Requires ERRMODE_EXCEPTION (set in the ctor).
     protected function query($query, array $bindings = [], $firstTry = true)
     {
         try {
-            if ($stmt = $this->pdo->prepare($query)) {
-                if ($stmt->execute($bindings)) return $stmt;
-                throw new \PDOException;
-            }
+            $stmt = $this->pdo->prepare($query);
+            $stmt->execute($bindings);
+            return $stmt;
         } catch (\PDOException $e) {
-            $stmt = strpos($e->getMessage(), 'Integrity constraint violation') !== false;
+            if ($firstTry && $this->isSchemaError($e)) {
+                $this->initialize();
+                return $this->query($query, $bindings, false);
+            }
+            throw $e;
         }
+    }
 
-        // the query failed to execute, assume it's caused by missing or old schema, try to reinitialize database
-        if (!$stmt && $firstTry) {
-            $this->initialize();
-            return $this->query($query, $bindings, false);
-        }
+    // Whether a PDO error signals a missing/out-of-date schema (a table or column doesn't exist)
+    // — the only case where reinitializing the tables is appropriate. Deliberately narrow: a
+    // 42000 syntax error shares the 42xxx SQLSTATE class with missing-table/column codes, so this
+    // matches specific codes plus the exact sqlite/mysql "no such / unknown" messages. When in
+    // doubt it returns false (rethrow) — never DROP on an ambiguous error.
+    protected function isSchemaError(\PDOException $e)
+    {
+        $code = (string) $e->getCode();
+        if (in_array($code, ['42S02', '42S22', '42P01', '42703'], true)) return true;
+
+        $message = strtolower($e->getMessage());
+        return strpos($message, 'no such table') !== false      // sqlite: missing table
+            || strpos($message, 'no such column') !== false      // sqlite: missing column
+            || strpos($message, 'unknown column') !== false;     // mysql: missing column
     }
 }
