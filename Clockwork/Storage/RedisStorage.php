@@ -132,18 +132,20 @@ SCRIPT;
         'parent', 'clientMetrics', 'webVitals'
     ];
 
-    // Metadata expiration time in minutes
+    // Redis client instance
     protected $redis;
 
-    // Metedata keys prefix
-    protected $expiration;
+    // Retention window in hours; cleanupEnabled gates automatic cleanup after store/update
+    protected $retentionHours;
+    protected $cleanupEnabled;
     protected $prefix;
 
-    public function __construct($connection, $expiration = null, $prefix = 'clockwork')
+    public function __construct($connection, $retentionHours = null, $prefix = 'clockwork', $cleanupEnabled = true)
     {
         $this->redis = is_array($connection) ? $this->createClient($connection) : $connection;
         $this->prefix = $this->isCluster($connection) ? "{{$prefix}}" : $prefix;
-        $this->expiration = $expiration === null ? 60 * 24 * 7 : $expiration;
+        $this->retentionHours = $retentionHours === null ? 168 : $retentionHours;
+        $this->cleanupEnabled = $cleanupEnabled;
     }
 
     protected function createClient($connection)
@@ -303,19 +305,6 @@ SCRIPT;
         return $this->loadRequest($id);
     }
 
-    // Search for requests based on the requests sorted set
-
-    public function findByUuid($uuid)
-    {
-        if ($id = $this->redis->get($this->prefix("uuid:{$uuid}"))) {
-            return $this->loadRequest($id);
-        }
-
-        foreach ($this->loadRequests($this->redis->zRange($this->prefix('requests'), 0, -1)) as $request) {
-            if ($request->uuid == $uuid) return $request;
-        }
-    }
-
     // Prefix a key with the configured prefix
 
     public function latest(?Search $search = null)
@@ -377,11 +366,7 @@ SCRIPT;
 
         $this->redis->zAdd($this->prefix('requests'), $data['time'], $data['id']);
         $this->redis->hMSet($this->prefix($data['id']), $data);
-        if ($this->expiration) $this->redis->expire($this->prefix($data['id']), $this->expiration * 60);
-        if ($data['uuid']) {
-            $this->redis->set($this->prefix("uuid:{$data['uuid']}"), $data['id']);
-            if ($this->expiration) $this->redis->expire($this->prefix("uuid:{$data['uuid']}"), $this->expiration * 60);
-        }
+        if ($this->retentionHours) $this->redis->expire($this->prefix($data['id']), $this->retentionHours * 3600);
 
         $this->redis->exec();
 
@@ -390,11 +375,20 @@ SCRIPT;
 
     // Retusna Requests instances from search results
 
-    public function cleanup()
+    public function cleanup($force = false)
     {
-        if ($this->expiration === false) return;
+        if ($force || $this->retentionHours === 0) {
+            $ids = $this->redis->zRange($this->prefix('requests'), 0, -1);
+            $this->redis->multi();
+            foreach ($ids as $id) $this->redis->del($this->prefix($id));
+            $this->redis->del($this->prefix('requests'));
+            $this->redis->exec();
+            return;
+        }
 
-        $this->redis->zRemRangeByScore($this->prefix('requests'), 0, time() - ($this->expiration * 60));
+        if (!$this->cleanupEnabled || !$this->retentionHours) return;
+
+        $this->redis->zRemRangeByScore($this->prefix('requests'), 0, time() - ($this->retentionHours * 3600));
     }
 
     public function update(Request $request)
@@ -408,11 +402,7 @@ SCRIPT;
         $this->redis->multi();
 
         $this->redis->hMSet($this->prefix($data['id']), $data);
-        if ($this->expiration) $this->redis->expire($this->prefix($data['id']), $this->expiration * 60);
-        if ($data['uuid']) {
-            $this->redis->set($this->prefix("uuid:{$data['uuid']}"), $data['id']);
-            if ($this->expiration) $this->redis->expire($this->prefix("uuid:{$data['uuid']}"), $this->expiration * 60);
-        }
+        if ($this->retentionHours) $this->redis->expire($this->prefix($data['id']), $this->retentionHours * 3600);
 
         $this->redis->exec();
 
