@@ -811,6 +811,8 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         // requests table (slimmed: no operation arrays, no uuid)
         $this->pdo->exec($this->buildSchema($table));
         $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->table}_time_index") . " ON {$table} (" . $this->quote('time') . ')');
+        // type: serves SqlSearch `type` filters and the overview `GROUP BY type` aggregate.
+        $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->table}_type_index") . " ON {$table} (" . $this->quote('type') . ')');
 
         // operations table + its indexes
         $this->pdo->exec($this->buildOperationsSchema($operationsTable));
