@@ -370,11 +370,12 @@ SCRIPT;
 
         $this->redis->exec();
 
-        $this->cleanup();
+        if ($this->cleanupEnabled) $this->cleanup();
     }
 
-    // Retusna Requests instances from search results
-
+    // Cleanup old requests. $force (or a zero retention window) clears everything; otherwise trims
+    // the requests index past the retention window. Always runs when called — the cleanupEnabled
+    // flag only gates the automatic cleanup after store/update.
     public function cleanup($force = false)
     {
         if ($force || $this->retentionHours === 0) {
@@ -385,8 +386,6 @@ SCRIPT;
             $this->redis->exec();
             return;
         }
-
-        if (!$this->cleanupEnabled || !$this->retentionHours) return;
 
         $this->redis->zRemRangeByScore($this->prefix('requests'), 0, time() - ($this->retentionHours * 3600));
     }
@@ -406,6 +405,6 @@ SCRIPT;
 
         $this->redis->exec();
 
-        $this->cleanup();
+        if ($this->cleanupEnabled) $this->cleanup();
     }
 }

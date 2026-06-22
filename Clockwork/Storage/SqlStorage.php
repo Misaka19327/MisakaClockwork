@@ -667,9 +667,12 @@ class SqlStorage extends Storage implements OperationsStorageInterface
             $row[$field] = $data[$field] ?? null;
         }
 
+        // SET every column except the primary key (id is immutable); WHERE id has its own :id
+        // binding so the SET and WHERE roles don't share a placeholder.
+        $setFields = array_filter(array_keys($this->fields), function ($field) { return $field !== 'id'; });
         $values = implode(', ', array_map(function ($field) {
             return $this->quote($field) . " = :{$field}";
-        }, array_keys($this->fields)));
+        }, $setFields));
         $update = $this->pdo->prepare("UPDATE {$this->table} SET {$values} WHERE id = :id");
 
         $operations = iterator_to_array($request->toOperations());
