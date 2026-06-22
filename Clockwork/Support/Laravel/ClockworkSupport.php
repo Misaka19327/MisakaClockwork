@@ -114,7 +114,7 @@ class ClockworkSupport
         return $this;
     }
 
-    // Retrieve reproduction details for a request by uuid
+    // Retrieve reproduction details for a request by id
 
     protected function frameworkDataSource()
     {
