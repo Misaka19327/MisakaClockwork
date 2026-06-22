@@ -209,7 +209,7 @@ SCRIPT;
         return $this->loadRequests($this->redis->zRange($this->prefix('requests'), 0, -1));
     }
 
-    // Return a single request by uuid
+    // Search the requests sorted set by the criteria in $search
 
     protected function search($direction, ?Search $search = null, $requestIndex = null, $count = null)
     {
