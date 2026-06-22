@@ -343,6 +343,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         switch ($category) {
             case 'database':
                 return [
+                    'total' => $opCount,
                     'select' => $bySubType['select'] ?? 0, 'insert' => $bySubType['insert'] ?? 0,
                     'update' => $bySubType['update'] ?? 0, 'delete' => $bySubType['delete'] ?? 0,
                     'other' => $bySubType['other'] ?? 0, 'slow' => $slow,
@@ -353,6 +354,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
                 $reads = ($bySubType['hit'] ?? 0) + ($bySubType['miss'] ?? 0);
                 $hits = $bySubType['hit'] ?? 0;
                 return [
+                    'total' => $opCount,
                     'hits' => $hits, 'misses' => max(0, $reads - $hits),
                     'writes' => $bySubType['write'] ?? 0, 'deletes' => $bySubType['delete'] ?? 0, 'readTotal' => $reads,
                     'hitRate' => $reads ? round($hits / $reads * 100, 1) : 0,

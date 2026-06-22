@@ -5,7 +5,7 @@ use Clockwork\Clockwork;
 use Clockwork\DataSource\PhpDataSource;
 use Clockwork\Helpers\{Serializer, ServerTiming, StackFilter, StackTrace};
 use Clockwork\Request\{IncomingRequest, Request};
-use Clockwork\Storage\{FileStorage, RedisStorage, Search, SqlStorage};
+use Clockwork\Storage\{OperationsStorageInterface, RedisStorage, Search, SqlStorage};
 use Clockwork\Web\Web;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\{JsonResponse, Response};
@@ -160,13 +160,11 @@ class ClockworkSupport
     // Return an asset for web ui based on it's path, resolves correct mime-type and protectes from accessing files
     // outside of Clockwork public dir
 
-    public function getEventDetailsByUuid($uuid)
+    public function getEventDetailsById($id)
     {
         if ($response = $this->ensureMetadataAccess()) return $response;
 
-        $storage = $this->app['clockwork']->storage();
-
-        $request = $storage->findByUuid($uuid);
+        $request = $this->app['clockwork']->storage()->find($id);
 
         if (!$request) {
             return new JsonResponse(['message' => 'Request not found.'], 404);
@@ -218,7 +216,6 @@ class ClockworkSupport
 
             $summary = $request->toFailureSummary();
             $failures[] = [
-                'uuid' => $request->uuid,
                 'id' => $request->id,
                 'type' => $request->type,
                 'name' => $summary['name'],
@@ -269,7 +266,6 @@ class ClockworkSupport
     {
         $details = $request->toEventDetails();
         $haystacks = array_filter([
-            $request->uuid,
             $request->id,
             $details['summary']['name'] ?? null,
             $details['summary']['title'] ?? null,
@@ -303,6 +299,15 @@ class ClockworkSupport
         $search = $this->operationsSearch($since, $until, $types);
 
         $storage = $this->app['clockwork']->storage();
+
+        // SQL fast path: aggregate from the operations table instead of walking requests
+        if ($storage instanceof OperationsStorageInterface) {
+            return new JsonResponse(array_merge(
+                ['window' => ['since' => $since, 'until' => $until]],
+                $storage->overviewStats($search)
+            ));
+        }
+
         $cursor = $storage->latest($search);
         $scanned = 0; $truncated = false;
 
@@ -344,8 +349,8 @@ class ClockworkSupport
 
             $events        += count($r->events ?: []);
             $views         += count($r->viewsData ?: []);
-            // Match operationsArray('notifications'), which folds legacy emailsData in too —
-            // otherwise the sidebar badge underreports vs. the operations list.
+            // Notifications fold in the legacy emailsData (now at write time in Request::toOperations),
+            // so the sidebar badge matches the operations list.
             $notifications += count($r->notifications ?: []) + count($r->emailsData ?: []);
 
             foreach ($r->log ?: [] as $entry) {
@@ -387,163 +392,33 @@ class ClockworkSupport
             return new JsonResponse(['message' => "Unknown operation category: {$category}", 'allowed' => $allowed], 400);
         }
 
+        $storage = $this->app['clockwork']->storage();
+
+        // Operation-centric listing is only supported by the SQL storage backend (operations are
+        // first-class rows there). Redis falls back to a 501 with an explanatory message.
+        if (! $storage instanceof OperationsStorageInterface) {
+            return new JsonResponse(['message' => 'Operations center requires the SQL storage backend.'], 501);
+        }
+
         $since = isset($input['since']) ? (float)$input['since'] : null;
         $until = isset($input['until']) ? (float)$input['until'] : null;
         $types = $this->csvInput($input['type'] ?? []);
-        $scanLimit = max(1, min((int)($input['scanLimit'] ?? 1000), 5000));
         $opLimit = max(1, min((int)($input['limit'] ?? 2000), 10000));
 
         $search = $this->operationsSearch($since, $until, $types);
-        $storage = $this->app['clockwork']->storage();
 
-        $cursor = $storage->latest($search);
-        $scanned = 0; $truncated = false; $requestCount = 0; $opCount = 0;
-        $operations = [];
-        $durationSum = 0.0; $durationCount = 0;
-        $tally = [
-            'commands' => [], 'levels' => [], 'events' => [], 'views' => [], 'types' => [],
-            'db' => ['queries' => 0, 'slow' => 0, 'duration' => 0.0, 'select' => 0, 'insert' => 0, 'update' => 0, 'delete' => 0, 'other' => 0],
-            'cache' => ['reads' => 0, 'hits' => 0, 'writes' => 0, 'deletes' => 0, 'time' => 0.0],
-            'slowestView' => ['name' => null, 'duration' => 0],
-        ];
-
-        while ($cursor) {
-            if ($scanned++ >= $scanLimit) { $truncated = true; break; }
-            $r = $cursor;
-            $arr = $this->operationsArray($r, $category);
-            if (!count($arr)) { $cursor = $this->previousOne($storage, $r->id, $search); continue; }
-            $requestCount++;
-
-            // Per-request counters feed the database / cache KPIs.
-            if ($category == 'database') {
-                $tally['db']['queries']  += $this->n($r->databaseQueriesCount);
-                $tally['db']['slow']     += $this->n($r->databaseSlowQueries);
-                $tally['db']['duration'] += $this->n($r->databaseDuration);
-                $tally['db']['select']   += $this->n($r->databaseSelects);
-                $tally['db']['insert']   += $this->n($r->databaseInserts);
-                $tally['db']['update']   += $this->n($r->databaseUpdates);
-                $tally['db']['delete']   += $this->n($r->databaseDeletes);
-                $tally['db']['other']    += $this->n($r->databaseOthers);
-            } elseif ($category == 'cache') {
-                $tally['cache']['reads']   += $this->n($r->cacheReads);
-                $tally['cache']['hits']    += $this->n($r->cacheHits);
-                $tally['cache']['writes']  += $this->n($r->cacheWrites);
-                $tally['cache']['deletes'] += $this->n($r->cacheDeletes);
-                $tally['cache']['time']    += $this->n($r->cacheTime);
-            }
-
-            foreach ($arr as $op) {
-                $opCount++;
-                $row = $this->operationRow($op, $r, $category);
-
-                $dur = $this->saneDuration($row['duration'] ?? null);
-                if ($dur !== null) { $durationSum += $dur; $durationCount++; }
-
-                switch ($category) {
-                    case 'redis':
-                        $c = $row['command'] ?? '?';
-                        $tally['commands'][$c] = ($tally['commands'][$c] ?? 0) + 1;
-                        break;
-                    case 'log':
-                        $lvl = $row['level'] ?? 'info';
-                        $tally['levels'][$lvl] = ($tally['levels'][$lvl] ?? 0) + 1;
-                        break;
-                    case 'events':
-                        $e = $row['event'] ?? '?';
-                        $tally['events'][$e] = ($tally['events'][$e] ?? 0) + 1;
-                        break;
-                    case 'views':
-                        $name = $row['data']['name'] ?? ($row['name'] ?? '?');
-                        $tally['views'][$name] = ($tally['views'][$name] ?? 0) + 1;
-                        if ($dur !== null && $dur > $tally['slowestView']['duration']) {
-                            $tally['slowestView'] = ['name' => $name, 'duration' => $dur];
-                        }
-                        break;
-                    case 'notifications':
-                        $t = $row['type'] ?? 'unknown';
-                        $tally['types'][$t] = ($tally['types'][$t] ?? 0) + 1;
-                        break;
-                }
-
-                if (count($operations) < $opLimit) $operations[] = $row;
-                else $truncated = true;
-            }
-
-            $cursor = $this->previousOne($storage, $r->id, $search);
-        }
-
-        $kpis = $this->buildOperationsKpis($category, $tally, $durationSum, $durationCount, $opCount, $requestCount);
+        $operations = $storage->operations($category, $search, $opLimit);
+        $kpis = $storage->operationStats($category, $search);
 
         return new JsonResponse([
             'category' => $category,
-            'window' => ['since' => $since, 'until' => $until, 'scannedRequests' => $scanned, 'truncated' => $truncated],
+            'window' => ['since' => $since, 'until' => $until],
             'kpis' => $kpis,
-            'total' => $opCount,
+            'total' => $kpis['total'] ?? count($operations),
             'returned' => count($operations),
-            'requestCount' => $requestCount,
+            'requestCount' => $kpis['requestCount'] ?? 0,
             'operations' => $operations,
         ]);
-    }
-
-    // Assemble the per-category KPI object from the walk tallies.
-    protected function buildOperationsKpis($category, $tally, $durationSum, $durationCount, $opCount, $requestCount)
-    {
-        $avg = $durationCount ? round($durationSum / $durationCount, 2) : 0;
-
-        switch ($category) {
-            case 'database':
-                $d = $tally['db'];
-                return [
-                    'select' => $d['select'], 'insert' => $d['insert'], 'update' => $d['update'],
-                    'delete' => $d['delete'], 'other' => $d['other'], 'slow' => $d['slow'],
-                    'avgDuration' => $d['queries'] ? round($d['duration'] / $d['queries'], 1) : 0,
-                    'totalDuration' => (int) round($d['duration']), 'requestCount' => $requestCount,
-                ];
-            case 'cache':
-                $c = $tally['cache'];
-                return [
-                    'hits' => $c['hits'], 'misses' => max(0, $c['reads'] - $c['hits']),
-                    'writes' => $c['writes'], 'deletes' => $c['deletes'], 'readTotal' => $c['reads'],
-                    'hitRate' => $c['reads'] ? round($c['hits'] / $c['reads'] * 100, 1) : 0,
-                    'avgDuration' => $avg, 'totalTime' => (int) round($c['time']), 'requestCount' => $requestCount,
-                ];
-            case 'redis':
-                arsort($tally['commands']);
-                return [
-                    'total' => $opCount, 'commands' => (object) $tally['commands'],
-                    'avgDuration' => $avg, 'totalTime' => (int) round($durationSum), 'requestCount' => $requestCount,
-                ];
-            case 'log':
-                $levels = $tally['levels'];
-                return [
-                    'total' => $opCount, 'byLevel' => (object) $levels,
-                    'error' => ($levels['error'] ?? 0) + ($levels['critical'] ?? 0) + ($levels['alert'] ?? 0) + ($levels['emergency'] ?? 0),
-                    'warning' => $levels['warning'] ?? 0, 'notice' => $levels['notice'] ?? 0,
-                    'info' => $levels['info'] ?? 0, 'debug' => $levels['debug'] ?? 0,
-                    'requestCount' => $requestCount,
-                ];
-            case 'events':
-                arsort($tally['events']);
-                return [
-                    'total' => $opCount, 'topEvents' => (object) array_slice($tally['events'], 0, 10, true),
-                    'avgDuration' => $avg, 'requestCount' => $requestCount,
-                ];
-            case 'views':
-                arsort($tally['views']);
-                return [
-                    'total' => $opCount, 'topViews' => (object) array_slice($tally['views'], 0, 10, true),
-                    'avgDuration' => $avg, 'totalTime' => (int) round($durationSum), 'requestCount' => $requestCount,
-                    'slowest' => (int) round($tally['slowestView']['duration']), 'slowestName' => $tally['slowestView']['name'],
-                ];
-            case 'notifications':
-                arsort($tally['types']);
-                return [
-                    'total' => $opCount, 'types' => (object) $tally['types'],
-                    'avgDuration' => $avg, 'totalTime' => (int) round($durationSum), 'requestCount' => $requestCount,
-                ];
-        }
-
-        return [];
     }
 
     // Search filter (received-time window + request type) shared by both aggregation walks.
@@ -596,80 +471,6 @@ class ClockworkSupport
         if ($request->type == 'test') return $request->testName ?: 'test';
 
         return $request->uri ?: (string) ($request->url ?? '');
-    }
-
-    // The operation array on a request for a given category.
-    protected function operationsArray($request, $category)
-    {
-        // Notifications also include the legacy emailsData (older Swift-based emails that
-        // predate the notifications data source), normalized to the notifications shape so
-        // old records don't silently drop their mail.
-        if ($category == 'notifications') {
-            $emails = [];
-            foreach ((array) ($request->emailsData ?: []) as $email) {
-                $data = (is_array($email) && isset($email['data']) && is_array($email['data'])) ? $email['data'] : [];
-                $emails[] = [
-                    'subject'     => $data['subject'] ?? null,
-                    'to'          => $data['to'] ?? null,
-                    'from'        => $data['from'] ?? null,
-                    'type'        => 'mail',
-                    'duration'    => $email['duration'] ?? null,
-                    'time'        => $email['start'] ?? null,
-                    'description' => $email['description'] ?? 'Sending an email message',
-                    '_source'     => 'emailsData',
-                ];
-            }
-
-            return array_merge(is_array($request->notifications) ? $request->notifications : [], $emails);
-        }
-
-        $map = [
-            'database' => 'databaseQueries', 'cache' => 'cacheQueries', 'redis' => 'redisCommands',
-            'log' => 'log', 'events' => 'events', 'views' => 'viewsData',
-        ];
-
-        $prop = $map[$category] ?? null;
-        if (!$prop) return [];
-
-        $arr = $request->$prop;
-
-        return is_array($arr) ? $arr : [];
-    }
-
-    // Infer a SQL type from the statement verb (real query records carry no explicit type).
-    protected function inferQueryType($sql)
-    {
-        $sql = ltrim((string) $sql);
-        if (preg_match('/^select\b/i', $sql)) return 'select';
-        if (preg_match('/^insert\b/i', $sql)) return 'insert';
-        if (preg_match('/^update\b/i', $sql)) return 'update';
-        if (preg_match('/^(delete|truncate)\b/i', $sql)) return 'delete';
-
-        return 'other';
-    }
-
-    // Cast an operation to a JSON row and attach the originating-request back-reference.
-    protected function operationRow($op, $request, $category)
-    {
-        $row = is_array($op) ? $op : (array) $op;
-
-        if ($category == 'database' && !isset($row['type'])) {
-            $row['type'] = $this->inferQueryType($row['query'] ?? '');
-        }
-
-        // Views store the view name nested under data.name; lift it so the UI can read row.name.
-        // Twig profiler entries (and any source without data.name) carry the name in description.
-        if ($category == 'views') {
-            $row['name'] = $row['data']['name'] ?? ($row['name'] ?? ($row['description'] ?? null));
-        }
-
-        $row['requestId'] = $request->id;
-        $row['requestUuid'] = $request->uuid;
-        $row['requestUri'] = $this->requestLabel($request);
-        $row['requestType'] = $request->type;
-        $row['requestTime'] = $request->time;
-
-        return $row;
     }
 
     // Make an authenticator instance based on the current configuration
@@ -825,7 +626,6 @@ class ClockworkSupport
         if ($this->isFeatureEnabled('queue')) {
             $this->app['clockwork.queue']->listenToEvents();
             $this->app['clockwork.queue']->setCurrentRequestId($this->app['clockwork.request']->id);
-            $this->app['clockwork.queue']->setCurrentRequestUuid($this->app['clockwork.request']->uuid);
         }
         if ($this->isFeatureEnabled('redis')) {
             $this->app[RedisManager::class]->enableEvents();
@@ -1010,16 +810,14 @@ class ClockworkSupport
 
             $request = new Request([
                 'id' => $payload['clockwork_id'],
-                'uuid' => $payload['clockwork_uuid'] ?? null
             ]);
             if (isset($payload['clockwork_parent_id'])) {
-                $request->setParent($payload['clockwork_parent_id'], ['uuid' => $payload['clockwork_parent_uuid'] ?? null]);
+                $request->setParent($payload['clockwork_parent_id']);
             }
 
             $this->app->make('clockwork')->reset()->request($request);
 
             $this->app['clockwork.queue']->setCurrentRequestId($request->id);
-            $this->app['clockwork.queue']->setCurrentRequestUuid($request->uuid);
         });
 
         $this->app['events']->listen(\Illuminate\Queue\Events\JobProcessed::class, function ($event) {
@@ -1111,32 +909,26 @@ class ClockworkSupport
 
     public function makeStorage()
     {
-        $storage = $this->getConfig('storage', 'files');
-        $expiration = $this->getConfig('storage_expiration');
+        $retentionHours = $this->getConfig('storage_retention_hours');
+        $cleanupEnabled = $this->getConfig('storage_cleanup_enabled', true);
 
-        if ($storage == 'sql') {
-            $database = $this->getConfig('storage_sql_database', storage_path('clockwork.sqlite'));
-            $table = $this->getConfig('storage_sql_table', 'clockwork');
-
-            if ($this->app['config']->get("database.connections.{$database}")) {
-                $database = $this->app['db']->connection($database)->getPdo();
-            } else {
-                $database = "sqlite:{$database}";
-            }
-
-            return new SqlStorage($database, $table, null, null, $expiration);
-        } elseif ($storage == 'redis') {
+        if ($this->getConfig('storage', 'sql') == 'redis') {
             $connection = $this->app['redis']->connection($this->getConfig('storage_redis'))->client();
 
-            return new RedisStorage($connection, $expiration, $this->getConfig('storage_redis_prefix', 'clockwork'));
-        } else {
-            return new FileStorage(
-                $this->getConfig('storage_files_path', storage_path('clockwork')),
-                0700,
-                $expiration,
-                $this->getConfig('storage_files_compress', false)
-            );
+            return new RedisStorage($connection, $retentionHours, $this->getConfig('storage_redis_prefix', 'clockwork'), $cleanupEnabled);
         }
+
+        $database = $this->getConfig('storage_sql_database', storage_path('clockwork.sqlite'));
+        $table = $this->getConfig('storage_sql_table', 'clockwork');
+        $operationsTable = $this->getConfig('storage_sql_operations_table', 'clockwork_operations');
+
+        if ($this->app['config']->get("database.connections.{$database}")) {
+            $database = $this->app['db']->connection($database)->getPdo();
+        } else {
+            $database = "sqlite:{$database}";
+        }
+
+        return new SqlStorage($database, $table, null, null, $operationsTable, $retentionHours, $cleanupEnabled);
     }
 
     // Check whether the web ui is enabled
@@ -1176,7 +968,6 @@ class ClockworkSupport
         }
 
         $response->headers->set('X-Clockwork-Id', $clockworkRequest->id, true);
-        $response->headers->set('X-Clockwork-Uuid', $clockworkRequest->uuid, true);
         $response->headers->set('X-Clockwork-Version', Clockwork::VERSION, true);
 
         if ($request->getBasePath()) {
@@ -1203,7 +994,6 @@ class ClockworkSupport
         if ($this->isCollectingClientMetrics() || $this->isToolbarEnabled()) {
             $clockworkBrowser = [
                 'requestId' => $clockworkRequest->id,
-                'requestUuid' => $clockworkRequest->uuid,
                 'version' => Clockwork::VERSION,
                 'path' => $request->getBasePath() . '/__clockwork/',
                 'webPath' => $request->getBasePath() . '/' . $this->webPaths()[0] . '/app',
