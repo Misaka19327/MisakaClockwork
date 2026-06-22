@@ -23,10 +23,6 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Whether automatic cleanup runs after each store
     protected $cleanupEnabled;
 
-    // Whether the operations table has been confirmed to exist (avoids repeated CREATE IF NOT
-    // EXISTS calls)
-    protected $operationsTableExists = false;
-
     // Schema for the Clockwork requests table — operation arrays are NOT stored here (they live
     // in the operations table); only the header, non-operation context, and denormalized counts
     // (which keep getStats cheap) remain.
@@ -252,8 +248,6 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Flat operation rows for a category, each carrying an originating-request back-reference.
     public function operations($category, ?Search $search = null, $limit = null)
     {
-        $this->ensureOperationsTable();
-
         $limit = $limit !== null ? max(1, (int)$limit) : null;
 
         $requestIds = $this->searchRequestIds($search);
@@ -292,8 +286,6 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Single-category KPIs, shape aligned with the former ClockworkSupport::buildOperationsKpis.
     public function operationStats($category, ?Search $search = null)
     {
-        $this->ensureOperationsTable();
-
         $requestIds = $this->searchRequestIds($search);
         if ($requestIds === []) return $this->emptyOperationStats($category);
 
@@ -413,8 +405,6 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // be reproduced in a query), so the result is tagged with failureRateMode.
     public function overviewStats(?Search $search = null)
     {
-        $this->ensureOperationsTable();
-
         $search = SqlSearch::fromBase($search, $this->pdo);
         $where = $search->query; // '' or 'WHERE ...'
         $bindings = $search->bindings;
@@ -629,8 +619,6 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Perform a single request store within a transaction.
     protected function storeOnce(Request $request)
     {
-        $this->ensureOperationsTable();
-
         $data = $request->toArray();
 
         foreach ($this->needsSerialization as $key) {
@@ -668,8 +656,6 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Update a request and replace its operations within a transaction.
     protected function updateOnce(Request $request)
     {
-        $this->ensureOperationsTable();
-
         $data = $request->toArray();
 
         foreach ($this->needsSerialization as $key) {
@@ -762,8 +748,6 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     protected function fetchOperationsForRequests(array $ids)
     {
         if (!count($ids)) return [];
-
-        $this->ensureOperationsTable();
         [$placeholder, $bindings] = $this->inClause($ids);
         $stmt = $this->query(
             "SELECT request_id, category, seq, data FROM {$this->operationsTable}"
@@ -804,58 +788,28 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         return [$notifications, $emails];
     }
 
-    // Create or update the Clockwork metadata tables (renames any existing requests table to a
-    // backup so no data is lost, then creates fresh requests + operations tables and indexes).
+    // (Re)create the Clockwork metadata tables from scratch. This fork is local-only and does not
+    // preserve old data on schema change, so existing tables are DROPped and recreated fresh (no
+    // rename-to-backup). Triggered by the lazy query()/store()/update() retry on first run or when
+    // a query fails against a missing/out-of-date schema.
     protected function initialize()
     {
-        // rename the existing requests table out of the way (preserving its data) and drop indexes
-        try {
-            $table = $this->quote($this->table);
-            $backupTableName = $this->quote("{$this->table}_backup_" . date('Ymd_His'));
-            $this->pdo->exec("ALTER TABLE {$table} RENAME TO {$backupTableName};");
+        $table = $this->quote($this->table);
+        $operationsTable = $this->quote($this->operationsTable);
 
-            $indexName = $this->quote("{$this->table}_time_index");
-            $this->pdo->exec("DROP INDEX {$indexName};"); // most sql implementations use global index names
-            $this->pdo->exec("DROP INDEX {$indexName} ON {$backupTableName};"); // mysql uses table-specific index names
-        } catch (\PDOException $e) {
-            // table doesn't yet exist, nothing to back up
+        foreach ([$table, $operationsTable] as $t) {
+            try { $this->pdo->exec("DROP TABLE IF EXISTS {$t}"); } catch (\PDOException $e) {}
         }
 
         // requests table (slimmed: no operation arrays, no uuid)
-        $table = $this->quote($this->table);
         $this->pdo->exec($this->buildSchema($table));
-        $indexName = $this->quote("{$this->table}_time_index");
-        $this->pdo->exec("CREATE INDEX {$indexName} ON {$table} (" . $this->quote('time') . ')');
+        $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->table}_time_index") . " ON {$table} (" . $this->quote('time') . ')');
 
-        // operations table + its indexes (non-destructive create-if-not-exists, shared with
-        // ensureOperationsTable so initialize() never fails if the table was already ensured)
-        $this->ensureOperationsTable();
-    }
-
-    // Non-destructively make sure the operations table exists (CREATE TABLE IF NOT EXISTS). Called
-    // on the operations read/write paths so a missing operations table — e.g. when upgrading from
-    // an old schema that only had the requests table — is created in place, instead of letting the
-    // generic query()'s lazy initialize() fire and rename the data-bearing requests table away.
-    protected function ensureOperationsTable()
-    {
-        if ($this->operationsTableExists) return;
-
-        $operationsTable = $this->quote($this->operationsTable);
-        $this->pdo->exec($this->buildOperationsSchema($operationsTable, true));
-
-        foreach ([
-            ["{$this->operationsTable}_category_time_index", [$this->quote('category'), $this->quote('time')]],
-            ["{$this->operationsTable}_request_index",       [$this->quote('request_id')]],
-            ["{$this->operationsTable}_time_index",          [$this->quote('time')]],
-        ] as [$indexName, $columns]) {
-            try {
-                $this->pdo->exec("CREATE INDEX IF NOT EXISTS " . $this->quote($indexName) . " ON {$operationsTable} (" . implode(', ', $columns) . ")");
-            } catch (\PDOException $e) {
-                // mysql doesn't support IF NOT EXISTS on CREATE INDEX; ignore duplicate-name errors
-            }
-        }
-
-        $this->operationsTableExists = true;
+        // operations table + its indexes
+        $this->pdo->exec($this->buildOperationsSchema($operationsTable));
+        $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->operationsTable}_category_time_index") . " ON {$operationsTable} (" . $this->quote('category') . ', ' . $this->quote('time') . ')');
+        $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->operationsTable}_request_index") . " ON {$operationsTable} (" . $this->quote('request_id') . ')');
+        $this->pdo->exec("CREATE INDEX " . $this->quote("{$this->operationsTable}_time_index") . " ON {$operationsTable} (" . $this->quote('time') . ')');
     }
 
     // Builds the query to create the requests table
@@ -871,11 +825,11 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     }
 
     // Builds the query to create the operations table
-    protected function buildOperationsSchema($table, $ifNotExists = false)
+    protected function buildOperationsSchema($table)
     {
         $textType = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) == 'mysql' ? 'MEDIUMTEXT' : 'TEXT';
 
-        return "CREATE TABLE" . ($ifNotExists ? " IF NOT EXISTS" : "") . " {$table} ("
+        return "CREATE TABLE {$table} ("
             . $this->quote('id') . ' ' . $this->primaryKeyStrategy() . ', '
             . $this->quote('request_id') . ' VARCHAR(100) NOT NULL, '
             . $this->quote('category') . ' VARCHAR(50) NOT NULL, '

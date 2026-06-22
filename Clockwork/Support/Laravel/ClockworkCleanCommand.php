@@ -22,8 +22,7 @@ class ClockworkCleanCommand extends Command
     {
         return [
             ['all', 'a', InputOption::VALUE_NONE, 'cleans all data'],
-            ['hours', null, InputOption::VALUE_REQUIRED, 'cleans data older than the specified number of hours'],
-            ['expiration', 'e', InputOption::VALUE_REQUIRED, 'deprecated alias for --hours, value in minutes']
+            ['hours', null, InputOption::VALUE_REQUIRED, 'cleans data older than the specified number of hours']
         ];
     }
 
@@ -42,13 +41,10 @@ class ClockworkCleanCommand extends Command
             // --all force-truncates both tables regardless of retention
             $this->laravel['clockwork.support']->makeStorage()->cleanup(true);
         } else {
-            // --hours / --expiration (or no arg) narrow the retention window, then run a normal
-            // time-based cleanup. They must NOT force-truncate (that was a regression).
+            // --hours (or no arg) narrows the retention window, then runs a normal time-based
+            // cleanup. It must NOT force-truncate.
             if (($hours = $this->option('hours')) !== null) {
                 $this->laravel['config']->set('clockwork.storage_retention_hours', (float) $hours);
-            } elseif ($expiration = $this->option('expiration')) {
-                // deprecated minutes-based alias, convert up to whole hours
-                $this->laravel['config']->set('clockwork.storage_retention_hours', ceil(((float) $expiration) / 60));
             }
 
             $this->laravel['clockwork.support']->makeStorage()->cleanup(false);
