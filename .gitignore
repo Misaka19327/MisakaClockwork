@@ -1,0 +1,9 @@
+# Composer — local dependencies and tooling, regenerated via `composer install`
+/vendor/
+/composer.phar
+
+# Local diagnostic scripts and run data
+/tmp_clockwork_*
+
+# Legacy frontend build backup — the published build is Clockwork/Web/public/v2
+/Clockwork/Web/public/v2.legacy/
