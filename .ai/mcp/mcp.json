@@ -4,7 +4,10 @@
             "command": "php",
             "args": [
                 "bin/clockwork-mcp.php"
-            ]
+            ],
+            "env": {
+                "CLOCKWORK_MCP_STORAGE_DSN": "sqlite:/absolute/path/to/storage/clockwork.sqlite"
+            }
         }
     }
 }

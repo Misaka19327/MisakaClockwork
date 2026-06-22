@@ -227,7 +227,6 @@ function OverviewPanel({ d, t }) {
       <div className="section-title">{t('请求与响应上下文')}</div>
       <div className="kv-list mb12">
         <Kv k="ID" v={d.id} />
-        <Kv k="UUID" v={d.uuid} />
         <Kv k={t('类型')} v={d.type} />
         <Kv k={t('时间')} v={d.timeStr} />
         <Kv k={t('方法')} v={d.method} />

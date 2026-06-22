@@ -24,7 +24,6 @@ export const REQUESTS = [
 // ── Single request detail payload ──
 export const DETAIL = {
   id: '1779256690-1032-14011576',
-  uuid: 'c1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c',
   type: 'request',
   method: 'GET',
   uri: '/api/users?page=1&per_page=25',

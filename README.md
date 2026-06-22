@@ -60,11 +60,13 @@ This repository now includes a local MCP server entrypoint at `bin/clockwork-mcp
 It exposes Clockwork metadata as MCP tools over `stdio`, so AI clients can connect directly to stored request data
 without going through the browser UI.
 
-By default, the server reads Clockwork file storage from:
+The server requires a SQL storage backend and reads the connection from the `CLOCKWORK_MCP_STORAGE_DSN` environment variable (eg. `sqlite:/absolute/path/to/clockwork.sqlite`). Optional overrides:
 
-- `CLOCKWORK_MCP_STORAGE_PATH` if set
-- `storage/clockwork`
-- `tmp_clockwork_storage`
+- `CLOCKWORK_MCP_STORAGE_SQL_TABLE` — requests table (default `clockwork`)
+- `CLOCKWORK_MCP_STORAGE_SQL_OPERATIONS_TABLE` — operations table (default `clockwork_operations`)
+- `CLOCKWORK_MCP_STORAGE_SQL_USERNAME` / `CLOCKWORK_MCP_STORAGE_SQL_PASSWORD` — credentials, when needed
+
+(File storage was removed; the operations center is SQL-only.)
 
 Start it manually with:
 

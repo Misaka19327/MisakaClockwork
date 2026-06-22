@@ -304,7 +304,6 @@ export function toDetail(r) {
   const status = requestStatus(r)
   return {
     id: r.id,
-    uuid: r.uuid,
     type: r.type,
     method: r.method || '—',
     uri: displayUri(r),

@@ -34,8 +34,7 @@ the client guards with `res.ok` + content-type.
 | GET | `/__clockwork/{id}/previous/{count}` | array of `count` requests older than id | RequestList (page back) |
 | GET | `/__clockwork/{id}/next/{count}` | array of `count` requests newer than id | RequestList (page forward) |
 | GET | `/__clockwork/failures?limit=&type=&status=&search=&since=` | failed-requests list | (future: 失败请求) |
-| GET | `/__clockwork/events/details/{uuid}` | event-details / failure-diagnosis payload | (future) |
-| GET | `/__clockwork/uuid/{uuid}/details` | same, keyed by uuid | (future) |
+| GET | `/__clockwork/events/details/{id}` | event-details / failure-diagnosis payload | (future) |
 | GET | `/__clockwork/env` | environment snapshot (PHP/Laravel/Clockwork versions, storage driver…) | (future: Overview) |
 | GET | `/__clockwork/stats?since=&until=&type=&limit=` | **overview KPIs** aggregated across recent requests (counts, errorRate, avgDuration, db/cache/redis/log totals). `failedRequests` uses the same definition as `/failures` (`requestHasFailures`: HTTP 4xx/5xx, command≠0, queue/test failed, error-level logs, failed outbound HTTP). Walks up to `limit` (default 1000) requests; durations outside 0–600000ms are rejected as corrupt. | Overview (backend ready, frontend not yet wired) |
 | GET | `/__clockwork/operations/{category}?since=&until=&type=&limit=&scanLimit=` | **operations center**: per-category (`database\|cache\|redis\|log\|events\|views\|notifications`) KPIs + a flattened list of individual operations, each carrying `requestId`/`requestUri`/`requestType`/`requestTime` for reverse-lookup. `total` = matched ops across the scanned set (pre-limit), `returned` = length of the returned (capped) list; `window.truncated` flags when either cap was hit. `notifications` also merges the legacy `emailsData` (old Swift-based mail). Client-side search/sort/paginate the returned list. | Operations center (backend ready, frontend not yet wired) |
@@ -52,7 +51,7 @@ Each request object already carries **everything** (the same payload whether fro
 Key fields the UI consumes:
 
 ```
-id, uuid, version, type, time, method, url, uri, controller,
+id, version, type, time, method, url, uri, controller,
 getData, postData, requestData, headers{}, cookies, sessionData, authenticatedUser,
 responseTime, responseStatus, responseDuration, memoryUsage, middleware[],
 databaseQueries[], databaseQueriesCount, databaseSlowQueries,
