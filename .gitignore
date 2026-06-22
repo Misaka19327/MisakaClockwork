@@ -1,6 +1,7 @@
 # Composer — local dependencies and tooling, regenerated via `composer install`
 /vendor/
 /composer.phar
+/composer.lock
 
 # Local diagnostic scripts and run data
 /tmp_clockwork_*
