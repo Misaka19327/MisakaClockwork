@@ -53,11 +53,11 @@ class ClockworkController extends Controller
 
     // Failures list endpoint
 
-    public function getEventDetails(ClockworkSupport $clockworkSupport, $uuid)
+    public function getEventDetailsById(ClockworkSupport $clockworkSupport, $id)
     {
         $this->ensureClockworkIsEnabled($clockworkSupport);
 
-        return $clockworkSupport->getEventDetailsByUuid($uuid);
+        return $clockworkSupport->getEventDetailsById($id);
     }
 
     // Environment snapshot endpoint
