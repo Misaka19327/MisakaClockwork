@@ -314,7 +314,7 @@ SCRIPT;
         }
 
         $requests = $this->loadRequests($this->redis->zRange($this->prefix('requests'), -1, -1));
-        return reset($requests);
+        return $requests ? reset($requests) : null;
     }
 
     // Load a single request by id from Redis

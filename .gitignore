@@ -8,3 +8,6 @@
 
 # Legacy frontend build backup — the published build is Clockwork/Web/public/v2
 /Clockwork/Web/public/v2.legacy/
+
+# IDE / editor local state
+/.idea/

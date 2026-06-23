@@ -258,6 +258,12 @@ export function requestFailed(r) {
   return (r.log || []).some(l => ERROR_LEVELS.has(l.level))
 }
 
+// Coerce a value loaded from storage (numbers come back as strings via Redis hGetAll / PDO)
+// into a real number, defaulting to 0 for null/undefined/empty/non-numeric — so downstream
+// .toFixed() calls and arithmetic don't throw on strings. Mirrors the local helper in
+// normalizeKpi, hoisted so the row/detail mappers share it.
+const num = (v) => (typeof v === 'number' ? v : (Number.isFinite(Number(v)) ? Number(v) : 0))
+
 // Request list row shape (matches what RequestList.jsx renders).
 export function toListRow(r) {
   const status = requestStatus(r)
@@ -268,8 +274,8 @@ export function toListRow(r) {
     uri: displayUri(r),
     controller: r.controller || '',
     status: status == null ? '—' : status,
-    dur: r.responseDuration ?? 0,
-    mem: r.memoryUsage ? r.memoryUsage / 1e6 : 0,
+    dur: num(r.responseDuration),
+    mem: r.memoryUsage ? num(r.memoryUsage) / 1e6 : 0,
     time: fmtDateTimeSec(r.time),
     failed: requestFailed(r),
   }
@@ -286,7 +292,7 @@ export function toFailureRow(f) {
     uri: f.name || '',
     controller: '',
     status: f.status == null ? '—' : f.status,
-    dur: f.duration ?? 0,
+    dur: num(f.duration),
     mem: null,
     time: fmtDateTimeSec(f.receivedAt),
     failed: true,
@@ -309,8 +315,8 @@ export function toDetail(r) {
     uri: displayUri(r),
     controller: r.controller || '',
     status: status == null ? '—' : status,
-    duration: r.responseDuration ?? 0,
-    memory: r.memoryUsage ?? 0,
+    duration: num(r.responseDuration),
+    memory: num(r.memoryUsage),
     time: r.time,
     timeStr: fmtDateTime(r.time),
     failed: requestFailed(r),
@@ -323,7 +329,7 @@ export function toDetail(r) {
     sessionData: r.sessionData || {},
     middleware: r.middleware || [],
     authenticatedUser: r.authenticatedUser,
-    totalDuration: r.responseDuration ?? 0,
+    totalDuration: num(r.responseDuration),
     timelineData: r.timelineData || [],
     databaseQueries: r.databaseQueries || [],
     cacheQueries: r.cacheQueries || [],
@@ -333,20 +339,20 @@ export function toDetail(r) {
     events: r.events || [],
     viewsData: r.viewsData || [],
     dbStats: {
-      count: r.databaseQueriesCount ?? (r.databaseQueries || []).length,
-      slow: r.databaseSlowQueries ?? 0,
-      duration: r.databaseDuration ?? 0,
-      selects: r.databaseSelects ?? 0,
-      inserts: r.databaseInserts ?? 0,
-      updates: r.databaseUpdates ?? 0,
-      deletes: r.databaseDeletes ?? 0,
+      count: num(r.databaseQueriesCount ?? (r.databaseQueries || []).length),
+      slow: num(r.databaseSlowQueries),
+      duration: num(r.databaseDuration),
+      selects: num(r.databaseSelects),
+      inserts: num(r.databaseInserts),
+      updates: num(r.databaseUpdates),
+      deletes: num(r.databaseDeletes),
     },
     cacheStats: {
-      reads: r.cacheReads ?? 0,
-      hits: r.cacheHits ?? 0,
-      writes: r.cacheWrites ?? 0,
-      deletes: r.cacheDeletes ?? 0,
-      time: r.cacheTime ?? 0,
+      reads: num(r.cacheReads),
+      hits: num(r.cacheHits),
+      writes: num(r.cacheWrites),
+      deletes: num(r.cacheDeletes),
+      time: num(r.cacheTime),
     },
   }
 }

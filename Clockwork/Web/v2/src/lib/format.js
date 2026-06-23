@@ -13,14 +13,19 @@ export function statusClass(s) {
 
 // Duration → human string ("1.2 ms", "2.3 s", "—")
 export function durStr(d) {
-  if (d == null) return '—'
+  // Storage (Redis hGetAll / PDO) returns numbers as strings, so coerce before formatting —
+  // otherwise "48.2".toFixed throws. null/undefined/""/non-numeric → em-dash.
+  d = Number(d)
+  if (!Number.isFinite(d)) return '—'
   if (d < 1) return '—'
   return d < 1000 ? d.toFixed(1) + ' ms' : (d / 1000).toFixed(1) + ' s'
 }
 
 // Memory (MB) → human string
 export function memStr(m) {
-  if (m == null) return '—'
+  // See durStr — coerce string numbers from storage before calling toFixed.
+  m = Number(m)
+  if (!Number.isFinite(m)) return '—'
   return m < 1 ? '—' : (m >= 10 ? m.toFixed(0) : m.toFixed(1)) + ' MB'
 }
 

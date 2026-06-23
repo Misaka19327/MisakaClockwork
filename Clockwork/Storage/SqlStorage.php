@@ -148,7 +148,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         $result = $this->query("SELECT {$fields} FROM {$this->table} WHERE id = :id", ['id' => $id]);
 
         $requests = $this->resultsToRequests($result);
-        return end($requests);
+        return $requests ? end($requests) : null;
     }
 
     // Return the latest request
@@ -163,7 +163,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         );
 
         $requests = $this->resultsToRequests($result);
-        return end($requests);
+        return $requests ? end($requests) : null;
     }
 
     // Return requests received before specified id, optionally limited to specified count
