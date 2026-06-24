@@ -262,9 +262,10 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // --- OperationsStorageInterface ---------------------------------------------
 
     // Flat operation rows for a category, each carrying an originating-request back-reference.
-    public function operations($category, ?Search $search = null, $limit = null)
+    public function operations($category, ?Search $search = null, $limit = null, $offset = 0)
     {
         $limit = $limit !== null ? max(1, (int)$limit) : null;
+        $offset = max(0, (int)$offset);
 
         $requestIds = $this->searchRequestIds($search);
         if ($requestIds === []) return [];
@@ -277,7 +278,10 @@ class SqlStorage extends Storage implements OperationsStorageInterface
             $bindings = array_merge($bindings, $inBindings);
         }
         $sql .= " ORDER BY time DESC";
-        if ($limit) $sql .= " LIMIT {$limit}";
+        if ($limit) {
+            $sql .= " LIMIT {$limit}";
+            if ($offset) $sql .= " OFFSET {$offset}";
+        }
 
         $stmt = $this->query($sql, $bindings);
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
