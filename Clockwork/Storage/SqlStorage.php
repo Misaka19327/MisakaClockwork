@@ -175,7 +175,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         $fields = $this->requestFields();
         $search = SqlSearch::fromBase($search, $this->pdo)->addCondition(
             $this->olderThanAnchorCondition(),
-            $this->anchorBindings($anchor)
+            $this->olderThanAnchorBindings($anchor)
         );
         $limit = $count ? "LIMIT {$count}" : '';
         $result = $this->query(
@@ -197,7 +197,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         $fields = $this->requestFields();
         $search = SqlSearch::fromBase($search, $this->pdo)->addCondition(
             $this->newerThanAnchorCondition(),
-            $this->anchorBindings($anchor)
+            $this->newerThanAnchorBindings($anchor)
         );
         $limit = $count ? "LIMIT {$count}" : '';
         $result = $this->query(
@@ -518,11 +518,21 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         return $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
     }
 
-    protected function anchorBindings(array $anchor)
+    protected function olderThanAnchorBindings(array $anchor)
     {
         return [
-            'anchor_id' => $anchor['id'],
-            'anchor_time' => $anchor['time'],
+            'anchor_id_lt' => $anchor['id'],
+            'anchor_time_lt' => $anchor['time'],
+            'anchor_time_gt' => $anchor['time'],
+        ];
+    }
+
+    protected function newerThanAnchorBindings(array $anchor)
+    {
+        return [
+            'anchor_id_gt' => $anchor['id'],
+            'anchor_time_lt' => $anchor['time'],
+            'anchor_time_gt' => $anchor['time'],
         ];
     }
 
@@ -531,7 +541,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         $time = $this->quote('time');
         $id = $this->quote('id');
 
-        return "({$time} < :anchor_time OR ({$time} = :anchor_time AND {$id} < :anchor_id))";
+        return "({$time} < :anchor_time_lt OR ({$time} = :anchor_time_gt AND {$id} < :anchor_id_lt))";
     }
 
     protected function newerThanAnchorCondition()
@@ -539,7 +549,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
         $time = $this->quote('time');
         $id = $this->quote('id');
 
-        return "({$time} > :anchor_time OR ({$time} = :anchor_time AND {$id} > :anchor_id))";
+        return "({$time} > :anchor_time_gt OR ({$time} = :anchor_time_lt AND {$id} > :anchor_id_gt))";
     }
 
     // Resolve the set of request ids matching a Search. Returns null when there is no filter
