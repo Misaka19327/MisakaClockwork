@@ -404,15 +404,16 @@ class ClockworkSupport
         $until = isset($input['until']) ? (float)$input['until'] : null;
         $types = $this->csvInput($input['type'] ?? []);
         $opLimit = max(1, min((int)($input['limit'] ?? 2000), 10000));
+        $offset = max(0, (int)($input['offset'] ?? 0));
 
         $search = $this->operationsSearch($since, $until, $types);
 
-        $operations = $storage->operations($category, $search, $opLimit);
+        $operations = $storage->operations($category, $search, $opLimit, $offset);
         $kpis = $storage->operationStats($category, $search);
 
         return new JsonResponse([
             'category' => $category,
-            'window' => ['since' => $since, 'until' => $until],
+            'window' => ['since' => $since, 'until' => $until, 'offset' => $offset],
             'kpis' => $kpis,
             'total' => $kpis['total'] ?? count($operations),
             'returned' => count($operations),
