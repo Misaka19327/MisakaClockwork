@@ -654,7 +654,7 @@ export default function Operations() {
                   )
                   return [main, detail]
                 })}
-                {!loading && hasMore && (
+                {!loading && !error && hasMore && (
                   <tr ref={sentinelRef}><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>
                 )}
                 {!loading && !hasMore && items.length > 0 && (
