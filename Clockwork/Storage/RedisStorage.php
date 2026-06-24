@@ -203,25 +203,26 @@ SCRIPT;
     public function all(?Search $search = null)
     {
         if ($search->isNotEmpty()) {
-            return $this->search($search);
+            return $this->search('all', $search);
         }
 
-        return $this->loadRequests($this->redis->zRange($this->prefix('requests'), 0, -1));
+        return $this->loadRequests($this->redis->zRevRange($this->prefix('requests'), 0, -1));
     }
 
     // Search the requests sorted set by the criteria in $search
 
     protected function search($direction, ?Search $search = null, $requestIndex = null, $count = null)
     {
-        if ($requestIndex) {
-            $ids = $direction == 'previous'
-                ? $this->redis->zRange($this->prefix('requests'), 0, $requestIndex)
-                : $this->redis->zRange($this->prefix('requests'), $requestIndex, -1);
+        if ($requestIndex !== null) {
+            if ($direction == 'previous') {
+                $ids = $this->redis->zRevRange($this->prefix('requests'), $requestIndex + 1, -1);
+            } else {
+                $ids = $this->redis->zRevRange($this->prefix('requests'), 0, $requestIndex - 1);
+                $ids = array_reverse($ids);
+            }
         } else {
-            $ids = $this->redis->zRange($this->prefix('requests'), 0, -1);
+            $ids = $this->redis->zRevRange($this->prefix('requests'), 0, -1);
         }
-
-        if ($direction == 'previous') $ids = array_reverse($ids);
 
         $keys = array_map(function ($id) {
             return $this->prefix($id);
@@ -246,7 +247,7 @@ SCRIPT;
 
         $results = $this->redis->eval(static::SEARCH_SCRIPT, array_merge($keys, $args, [$count]), count($keys));
 
-        if ($direction == 'previous') $results = array_reverse($results);
+        if ($direction == 'next' && $requestIndex !== null) $results = array_reverse($results);
 
         return $this->resultsToRequests($results);
     }
@@ -310,10 +311,11 @@ SCRIPT;
     public function latest(?Search $search = null)
     {
         if ($search->isNotEmpty()) {
-            return $this->search('previous', $search, -1, 1);
+            $requests = $this->search('all', $search, null, 1);
+            return $requests ? reset($requests) : null;
         }
 
-        $requests = $this->loadRequests($this->redis->zRange($this->prefix('requests'), -1, -1));
+        $requests = $this->loadRequests($this->redis->zRevRange($this->prefix('requests'), 0, 0));
         return $requests ? reset($requests) : null;
     }
 
@@ -321,35 +323,34 @@ SCRIPT;
 
     public function previous($id, $count = null, ?Search $search = null)
     {
-        $requestIndex = $this->redis->zRank($this->prefix('requests'), $id) - 1;
+        $requestIndex = $this->redis->zRevRank($this->prefix('requests'), $id);
 
-        if ($requestIndex < 0) return [];
+        if ($requestIndex === false || $requestIndex + 1 == $this->redis->zCard($this->prefix('requests'))) return [];
 
         if ($search->isNotEmpty()) {
             return $this->search('previous', $search, $requestIndex, $count);
         }
 
-        $startIndex = $count === null ? 0 : max($requestIndex - $count, 0);
+        $endIndex = $count === null ? -1 : $requestIndex + $count;
 
-        return $this->loadRequests($this->redis->zRange($this->prefix('requests'), $startIndex, $requestIndex));
+        return $this->loadRequests($this->redis->zRevRange($this->prefix('requests'), $requestIndex + 1, $endIndex));
     }
 
     // Load multiple requests by ids from Redis
 
     public function next($id, $count = null, ?Search $search = null)
     {
-        $requestIndex = $this->redis->zRank($this->prefix('requests'), $id);
-        $indexLength = $this->redis->zCard($this->prefix('requests'));
+        $requestIndex = $this->redis->zRevRank($this->prefix('requests'), $id);
 
-        if ($requestIndex + 1 == $indexLength) return [];
+        if ($requestIndex === false || $requestIndex === 0) return [];
 
         if ($search->isNotEmpty()) {
-            return $this->search('next', $search, $requestIndex + 1, $count);
+            return $this->search('next', $search, $requestIndex, $count);
         }
 
-        $endIndex = $count === null ? -1 : min($requestIndex + $count, $indexLength);
+        $startIndex = $count === null ? 0 : max($requestIndex - $count, 0);
 
-        return $this->loadRequests($this->redis->zRange($this->prefix('requests'), $requestIndex + 1, $endIndex));
+        return $this->loadRequests($this->redis->zRevRange($this->prefix('requests'), $startIndex, $requestIndex - 1));
     }
 
     // Returns a Request instance from a single Redis record

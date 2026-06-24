@@ -130,11 +130,12 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Returns all requests
     public function all(?Search $search = null)
     {
-        $fields = implode(', ', array_map(function ($field) {
-            return $this->quote($field);
-        }, array_keys($this->fields)));
+        $fields = $this->requestFields();
         $search = SqlSearch::fromBase($search, $this->pdo);
-        $result = $this->query("SELECT {$fields} FROM {$this->table} {$search->query}", $search->bindings);
+        $result = $this->query(
+            "SELECT {$fields} FROM {$this->table} {$search->query} ORDER BY {$this->requestOrderByDesc()}",
+            $search->bindings
+        );
 
         return $this->resultsToRequests($result);
     }
@@ -142,9 +143,7 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Return a single request by id
     public function find($id)
     {
-        $fields = implode(', ', array_map(function ($field) {
-            return $this->quote($field);
-        }, array_keys($this->fields)));
+        $fields = $this->requestFields();
         $result = $this->query("SELECT {$fields} FROM {$this->table} WHERE id = :id", ['id' => $id]);
 
         $requests = $this->resultsToRequests($result);
@@ -154,12 +153,11 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     // Return the latest request
     public function latest(?Search $search = null)
     {
-        $fields = implode(', ', array_map(function ($field) {
-            return $this->quote($field);
-        }, array_keys($this->fields)));
+        $fields = $this->requestFields();
         $search = SqlSearch::fromBase($search, $this->pdo);
         $result = $this->query(
-            "SELECT {$fields} FROM {$this->table} {$search->query} ORDER BY id DESC LIMIT 1", $search->bindings
+            "SELECT {$fields} FROM {$this->table} {$search->query} ORDER BY {$this->requestOrderByDesc()} LIMIT 1",
+            $search->bindings
         );
 
         $requests = $this->resultsToRequests($result);
@@ -170,34 +168,48 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     public function previous($id, $count = null, ?Search $search = null)
     {
         $count = (int)$count;
+        $anchor = $this->requestAnchor($id);
 
-        $fields = implode(', ', array_map(function ($field) {
-            return $this->quote($field);
-        }, array_keys($this->fields)));
-        $search = SqlSearch::fromBase($search, $this->pdo)->addCondition('id < :id', ['id' => $id]);
+        if (!$anchor) return [];
+
+        $fields = $this->requestFields();
+        $search = SqlSearch::fromBase($search, $this->pdo)->addCondition(
+            $this->olderThanAnchorCondition(),
+            $this->anchorBindings($anchor)
+        );
         $limit = $count ? "LIMIT {$count}" : '';
         $result = $this->query(
-            "SELECT {$fields} FROM {$this->table} {$search->query} ORDER BY id DESC {$limit}", $search->bindings
+            "SELECT {$fields} FROM {$this->table} {$search->query} ORDER BY {$this->requestOrderByDesc()} {$limit}",
+            $search->bindings
         );
 
-        return array_reverse($this->resultsToRequests($result));
+        return $this->resultsToRequests($result);
     }
 
     // Return requests received after specified id, optionally limited to specified count
     public function next($id, $count = null, ?Search $search = null)
     {
         $count = (int)$count;
+        $anchor = $this->requestAnchor($id);
 
-        $fields = implode(', ', array_map(function ($field) {
-            return $this->quote($field);
-        }, array_keys($this->fields)));
-        $search = SqlSearch::fromBase($search, $this->pdo)->addCondition('id > :id', ['id' => $id]);
+        if (!$anchor) return [];
+
+        $fields = $this->requestFields();
+        $search = SqlSearch::fromBase($search, $this->pdo)->addCondition(
+            $this->newerThanAnchorCondition(),
+            $this->anchorBindings($anchor)
+        );
         $limit = $count ? "LIMIT {$count}" : '';
         $result = $this->query(
-            "SELECT {$fields} FROM {$this->table} {$search->query} ORDER BY id ASC {$limit}", $search->bindings
+            "SELECT {$fields} FROM {$this->table} {$search->query} ORDER BY "
+            . ($count ? $this->requestOrderByAsc() : $this->requestOrderByDesc())
+            . " {$limit}",
+            $search->bindings
         );
 
-        return $this->resultsToRequests($result);
+        $requests = $this->resultsToRequests($result);
+
+        return $count ? array_reverse($requests) : $requests;
     }
 
     // Store the request and its operations atomically. On the first run (tables missing) the lazy
@@ -476,6 +488,58 @@ class SqlStorage extends Storage implements OperationsStorageInterface
     protected function saneDuration($v)
     {
         return ($v !== null && is_numeric($v) && $v >= 0 && $v < 600000) ? $v * 1 : null;
+    }
+
+    protected function requestFields()
+    {
+        return implode(', ', array_map(function ($field) {
+            return $this->quote($field);
+        }, array_keys($this->fields)));
+    }
+
+    protected function requestOrderByDesc()
+    {
+        return $this->quote('time') . ' DESC, ' . $this->quote('id') . ' DESC';
+    }
+
+    protected function requestOrderByAsc()
+    {
+        return $this->quote('time') . ' ASC, ' . $this->quote('id') . ' ASC';
+    }
+
+    protected function requestAnchor($id)
+    {
+        $stmt = $this->query(
+            "SELECT " . $this->quote('id') . ", " . $this->quote('time')
+            . " FROM {$this->table} WHERE " . $this->quote('id') . " = :id",
+            ['id' => $id]
+        );
+
+        return $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+    }
+
+    protected function anchorBindings(array $anchor)
+    {
+        return [
+            'anchor_id' => $anchor['id'],
+            'anchor_time' => $anchor['time'],
+        ];
+    }
+
+    protected function olderThanAnchorCondition()
+    {
+        $time = $this->quote('time');
+        $id = $this->quote('id');
+
+        return "({$time} < :anchor_time OR ({$time} = :anchor_time AND {$id} < :anchor_id))";
+    }
+
+    protected function newerThanAnchorCondition()
+    {
+        $time = $this->quote('time');
+        $id = $this->quote('id');
+
+        return "({$time} > :anchor_time OR ({$time} = :anchor_time AND {$id} > :anchor_id))";
     }
 
     // Resolve the set of request ids matching a Search. Returns null when there is no filter
