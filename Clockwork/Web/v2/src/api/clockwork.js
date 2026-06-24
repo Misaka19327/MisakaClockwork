@@ -17,6 +17,11 @@
 const API_BASE = '/__clockwork'
 const TOKEN_KEY = 'clockwork:token'
 
+function qs(params = {}) {
+  const s = new URLSearchParams(params).toString()
+  return s ? `?${s}` : ''
+}
+
 export function getToken() {
   try { return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) } catch (_) { return null }
 }
@@ -113,7 +118,7 @@ export const api = {
    * `GET /__clockwork/latest` → a single request object (the special id `latest`).
    * Note: `latest` is NOT a valid paging anchor — `latest/previous/N` returns `[]`.
    */
-  latest() { return request('/latest') },
+  latest(params = {}) { return request('/latest' + qs(params)) },
 
   /**
    * One request by id.
@@ -135,7 +140,7 @@ export const api = {
    * `GET /__clockwork/{id}/previous/{count}` → array of `count` request objects older than `id`.
    * Used by: RequestList (initial load via `recent()`, plus backward paging).
    */
-  previous(id, count) { return request(`/${encodeURIComponent(id)}/previous/${count}`) },
+  previous(id, count, params = {}) { return request(`/${encodeURIComponent(id)}/previous/${count}` + qs(params)) },
 
   /**
    * Page forwards (newer) from an anchor id.
@@ -145,24 +150,24 @@ export const api = {
   next(id, count) { return request(`/${encodeURIComponent(id)}/next/${count}`) },
 
   /**
-   * Failed-requests list.
-   * `GET /__clockwork/failures?limit=&type=&status=&search=&since=` → array of failed request
-   * summaries. `limit` is clamped server-side to 1..100. Reserved for the 失败事件 nav item.
+   * Failed-events list (cursor-paged). `GET /__clockwork/failures?cursor=&type=&status=&search=&since=&limit=`
+   * → `{ failures, nextCursor }`. `nextCursor` is the request id to resume from (null when done).
+   * Reserved for the 失败事件 nav item.
    */
-  failures(params = {}) {
-    const q = new URLSearchParams(params).toString()
-    return request('/failures' + (q ? `?${q}` : ''))
+  async failures(params = {}) {
+    const data = await request('/failures' + qs(params))
+    return { failures: data?.failures ?? [], nextCursor: data?.nextCursor ?? null }
   },
 
   /**
-   * Convenience: the `count` most-recent requests (latest first).
-   * Two-step because `latest/previous/N` returns `[]`: resolve the latest id, then page back
-   * from it. Returns `[latest, ...previous(latest.id, count-1)]`. Used by: RequestList.
+   * Convenience: the `count` most-recent requests (latest first), optionally server-side filtered
+   * by type. Two-step because `latest/previous/N` returns `[]`: resolve the latest id, then page
+   * back from it. Returns `[latest, ...previous(latest.id, count-1)]`. Used by: RequestList.
    */
-  async recent(count = 50) {
-    const latest = await this.latest()
+  async recent(count = 50, params = {}) {
+    const latest = await this.latest(params)
     if (!latest) return []
-    const older = await this.previous(latest.id, Math.max(0, count - 1))
+    const older = await this.previous(latest.id, Math.max(0, count - 1), params)
     return [latest, ...(Array.isArray(older) ? older : [])]
   },
 
