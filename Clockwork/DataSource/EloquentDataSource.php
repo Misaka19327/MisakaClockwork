@@ -198,6 +198,10 @@ class EloquentDataSource extends DataSource
 
         $query = [
             'query' => $this->createRunnableQuery($event->sql, $event->bindings, $event->connectionName),
+            // Bindings kept as a separate field (normalized, mirroring Request::addDatabaseQuery) so the
+            // actual parameters are always visible with their original types, even when createRunnableQuery
+            // leaves a `?` unsubstituted (e.g. empty or malformed bindings).
+            'bindings' => (new Serializer)->normalize($event->bindings),
             'duration' => $event->time,
             'result' => $captured ? (new Serializer)->normalize($captured['result']) : null,
             'resultAvailable' => $captured ? true : false,
