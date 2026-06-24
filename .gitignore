@@ -11,3 +11,6 @@
 
 # IDE / editor local state
 /.idea/
+
+# Worktree scratch directory (isolated feature workspaces)
+/.worktrees/
