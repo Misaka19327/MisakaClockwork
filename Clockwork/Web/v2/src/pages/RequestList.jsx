@@ -7,6 +7,7 @@ import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { MethodBadge, StatusBadge, TypeBadge } from '../components/Badges.jsx'
 import { api, toListRow, toFailureRow } from '../api/clockwork.js'
+import { usePagedList } from '../hooks/usePagedList.js'
 import './request-list.css'
 
 const TYPE_FILTERS = [
@@ -26,51 +27,59 @@ export default function RequestList() {
   const failedMode = params.get('type') === 'failed'
   const [activeType, setActiveType] = useState('all')
   const [search, setSearch] = useState('')
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const tbodyRef = useRef(null)
   const topbarRef = useRef(null)
   const sidebarRef = useRef(null)
+  const scrollRef = useRef(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      if (failedMode) {
-        // GET /__clockwork/failures → failure summaries, already filtered to failed by the backend
-        // (same requestHasFailures definition the sidebar badge counts).
-        const data = await api.failures({ limit: 100 })
-        setRows((Array.isArray(data) ? data : []).map(toFailureRow))
-      } else {
-        // GET /__clockwork/latest + /__clockwork/{latest.id}/previous/99 → most-recent 100 requests
-        const data = await api.recent(100)
-        setRows(data.map(toListRow))
-      }
-    } catch (e) {
-      setError(e.message || String(e))
-      setRows([])
-    } finally {
-      setLoading(false)
+  // Type filtering is server-side: 'all' omits the type param; anything else is forwarded to
+  // latest/previous (and to /failures, which already accepts type). Switching type therefore has
+  // to reset paging from page 0 — handled by the reload effect below.
+  const typeParam = activeType === 'all' ? {} : { type: activeType }
+
+  const fetch = useCallback(async (pageState, batchSize) => {
+    if (failedMode) {
+      // /failures is cursor-paged: resume from nextCursor (null on the first batch).
+      const cursor = pageState?.nextCursor ?? null
+      const { failures, nextCursor } = await api.failures({ ...(cursor ? { cursor } : {}), ...typeParam, limit: batchSize })
+      const items = failures.map(toFailureRow)
+      return { items, nextPageState: { nextCursor }, hasMore: !!nextCursor }
     }
-  }, [failedMode])
+    // recent/previous are id-cursor paged. The first batch resolves the latest id then pages back
+    // from it; subsequent batches page back from the last id of the previous batch.
+    if (pageState === null) {
+      const items = (await api.recent(batchSize, typeParam)).map(toListRow)
+      return { items, nextPageState: { lastId: items.length ? items[items.length - 1].id : null }, hasMore: items.length === batchSize }
+    }
+    const lastId = pageState.lastId
+    if (!lastId) return { items: [], nextPageState: pageState, hasMore: false }
+    const items = (await api.previous(lastId, batchSize, typeParam)).map(toListRow)
+    return { items, nextPageState: { lastId: items.length ? items[items.length - 1].id : null }, hasMore: items.length === batchSize }
+  }, [failedMode, typeParam])
 
-  useEffect(() => { load() }, [load])
+  const { items: rows, loading, error, hasMore, reload, loadMore, sentinelRef } = usePagedList({ fetch, batchSize: 50, rootRef: scrollRef })
+
+  // Server-side reset when the type filter or failure mode changes. The hook's own mount effect
+  // already fires the initial batch, so we skip the first run here to avoid a double initial fetch.
+  const firstRunRef = useRef(true)
+  useEffect(() => {
+    if (firstRunRef.current) { firstRunRef.current = false; return }
+    reload()
+  }, [activeType, failedMode, reload])
 
   const filtered = useMemo(() => {
     let r = rows
-    // Type filtering is local for the recent list; the failures endpoint is already cross-type.
-    if (!failedMode && activeType !== 'all') r = r.filter(x => x.type === activeType)
+    // Search stays client-side over the already-loaded rows. Type filtering is now server-side
+    // (typeParam above), so it is deliberately NOT applied here.
     if (search.trim()) {
       const q = search.toLowerCase()
       r = r.filter(x => x.uri.toLowerCase().includes(q) || (x.controller || '').toLowerCase().includes(q) || (x.failureMsg || '').toLowerCase().includes(q))
     }
-    // Default order: most-recent first by occurrence time. The backend already returns rows newest
-    // first (latest + previous ORDER BY id DESC), but we sort explicitly so the default is guaranteed
-    // by the UI regardless of paging or backend changes.
-    return [...r].sort((a, b) => (b.ts || 0) - (a.ts || 0))
-  }, [rows, activeType, search, failedMode])
+    // Newest-first is already guaranteed by the backend (latest + previous ORDER BY id DESC, and
+    // /failures returns newest first); we preserve paging order rather than re-sorting.
+    return r
+  }, [rows, search])
 
   // Stagger rows whenever the filtered set changes.
   useEffect(() => {
@@ -94,7 +103,7 @@ export default function RequestList() {
   function onRefresh(e) {
     if (motionOk()) gsap.to(e.currentTarget, { scale: 0.96, duration: 0.06, yoyo: true, repeat: 1, ease: 'power2.inOut' })
     setRefreshing(true)
-    load().finally(() => setRefreshing(false))
+    reload().finally(() => setRefreshing(false))
   }
 
   return (
@@ -133,7 +142,7 @@ export default function RequestList() {
           />
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap" ref={scrollRef}>
           <table className="list-table">
             <thead>
               <tr>
@@ -177,6 +186,15 @@ export default function RequestList() {
                   </tr>
                 )
               })}
+              {!loading && !error && hasMore && (
+                <tr ref={sentinelRef}><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>
+              )}
+              {!loading && !error && !hasMore && rows.length > 0 && (
+                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('没有更早的记录了')}</div></div></td></tr>
+              )}
+              {error && rows.length > 0 && (
+                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载失败')}：{error} <button className="btn" onClick={loadMore}>{t('重试')}</button></div></div></td></tr>
+              )}
             </tbody>
           </table>
         </div>

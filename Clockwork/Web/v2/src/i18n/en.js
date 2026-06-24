@@ -206,6 +206,7 @@ export const EN = {
   '加载失败': 'Failed to load',
   '暂无事件': 'No events',
   '暂无失败事件': 'No failed events',
+  '没有更早的记录了': 'No older records',
   '请求未找到': 'Request not found',
   '重试': 'Retry',
 }
