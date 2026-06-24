@@ -6,6 +6,7 @@ import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { ExpandableCode, ExpandableTrace } from '../components/ExpandableCode.jsx'
 import { api, normalizeKpi } from '../api/clockwork.js'
+import { usePagedList } from '../hooks/usePagedList.js'
 import { CATEGORY_ORDER } from '../data/operations.js'
 import './operations.css'
 
@@ -398,9 +399,6 @@ export default function Operations() {
   const [params] = useSearchParams()
   const currentCat = CATEGORY_ORDER.includes(params.get('category')) ? params.get('category') : 'database'
 
-  const [data, setData] = useState(null) // { kpis, operations, total, returned, requestCount, window }
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [timeWindow, setTimeWindow] = useState('24h')
   const [reqType, setReqType] = useState('all')
   const [filterSearch, setFilterSearch] = useState('')
@@ -409,31 +407,48 @@ export default function Operations() {
   const [expandedIdx, setExpandedIdx] = useState(null)
   const tbodyRef = useRef(null)
   const kpiRef = useRef(null)
-  const reqIdRef = useRef(0)
+  const scrollRef = useRef(null)
+  // kpis/total describe the WHOLE matched window, not a page. They come from the first batch's
+  // (offset 0) response and must persist across later offset fetches, so they live here in state
+  // rather than inside usePagedList's accumulated items.
+  const [kpis, setKpis] = useState(null)
+  const [total, setTotal] = useState(0)
 
   const ui = CATEGORY_UI[currentCat]
   const goRequest = (requestId) => navigate(`/requests/${requestId}`)
 
-  // GET /__clockwork/operations/{category} whenever the category, time window or request-type
-  // filter changes. The returned operations list is searched/sorted/paginated client-side.
-  const load = useCallback(() => {
-    // Sequence guard: only the most recent fetch's result is applied, so rapidly switching
-    // category/time-window/type can't let a slow older response overwrite the current view.
-    const id = ++reqIdRef.current
-    setLoading(true); setError(''); setExpandedIdx(null)
-    const p = {}
+  // Offset-paged fetch for /__clockwork/operations/{category}. sinceParam/typeParam are derived
+  // from the three primitive filters below, so the callback only needs to depend on those.
+  const fetch = useCallback(async (pageState, batchSize) => {
+    const offset = pageState?.offset ?? 0
+    const p = { offset, limit: batchSize }
     if (WINDOW_SECONDS[timeWindow]) p.since = Math.floor(Date.now() / 1000) - WINDOW_SECONDS[timeWindow]
     if (reqType !== 'all') p.type = reqType
-    api.operations(currentCat, p)
-      .then(d => { if (reqIdRef.current === id) setData(d) })
-      .catch(e => { if (reqIdRef.current === id) setError(e.message || String(e)) })
-      .finally(() => { if (reqIdRef.current === id) setLoading(false) })
+    const d = await api.operations(currentCat, p)
+    if (offset === 0) {
+      setKpis(d?.kpis ? normalizeKpi(currentCat, d.kpis) : null)
+      setTotal(d?.total ?? 0)
+    }
+    const items = d?.operations ?? []
+    return { items, nextPageState: { offset: offset + items.length }, hasMore: offset + items.length < (d?.total ?? 0) }
   }, [currentCat, timeWindow, reqType])
 
-  useEffect(() => { load() }, [load])
+  const { items, loading, error, hasMore, reload, loadMore, sentinelRef } = usePagedList({ fetch, batchSize: 50, rootRef: scrollRef })
 
+  // Reset paging from offset 0 when a primitive filter changes. The hook's own mount effect
+  // already fires the initial batch (its `reload` is memoized on batchSize only, so depending on
+  // [reload] would NOT refire on filter change — hence this primitive-keyed effect). The
+  // firstRunRef skips the very first run to avoid a double initial fetch.
+  const firstRunRef = useRef(true)
+  useEffect(() => {
+    if (firstRunRef.current) { firstRunRef.current = false; return }
+    setExpandedIdx(null)
+    reload()
+  }, [currentCat, timeWindow, reqType, reload])
+
+  // Search + column sort stay client-side over the already-loaded (paged) items.
   const rows = useMemo(() => {
-    let r = (data?.operations || []).slice()
+    let r = (items || []).slice()
     if (filterSearch.trim()) {
       const q = filterSearch.toLowerCase()
       r = r.filter(row => {
@@ -460,7 +475,7 @@ export default function Operations() {
       })
     }
     return r
-  }, [data, currentCat, filterSearch, sortCol, sortDir])
+  }, [items, currentCat, filterSearch, sortCol, sortDir])
 
   // Stagger rows on data/filter change.
   useEffect(() => {
@@ -537,8 +552,6 @@ export default function Operations() {
     return renderCell(col, d)
   }
 
-  const kpis = data ? normalizeKpi(currentCat, data.kpis || {}) : null
-
   return (
     <div className="operations-page">
       <Sidebar />
@@ -585,13 +598,13 @@ export default function Operations() {
             />
             <span className="spacer" />
             <span className="summary">
-              {t('共')} {rows.length} {t('条')}{t('（共')}{fmt(data?.total)}{t('条')}{t('）')}{data?.window?.truncated ? ' · ⚠' : ''}
+              {t('共')} {rows.length} {t('条')}{t('（共')}{fmt(total)}{t('条')}{t('）')}
             </span>
           </div>
         )}
 
         {!loading && !error && (
-          <div className="table-wrap">
+          <div className="table-wrap" ref={scrollRef}>
             <table className="op-table">
               <thead>
                 <tr>
@@ -641,6 +654,15 @@ export default function Operations() {
                   )
                   return [main, detail]
                 })}
+                {!loading && hasMore && (
+                  <tr ref={sentinelRef}><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>
+                )}
+                {!loading && !hasMore && items.length > 0 && (
+                  <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('没有更早的记录了')}</div></div></td></tr>
+                )}
+                {error && items.length > 0 && (
+                  <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('加载失败')}：{error} <button className="btn" onClick={loadMore}>{t('重试')}</button></div></div></td></tr>
+                )}
               </tbody>
             </table>
           </div>
