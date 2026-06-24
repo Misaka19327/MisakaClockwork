@@ -93,7 +93,7 @@ export default function Overview() {
                 <div className="kpi-sub">{t('失败')} {fmt(stats.failedRequests)} · {t('命令')} {fmt(stats.byType?.command)} · {t('队列')} {fmt(stats.byType?.['queue-job'])}</div>
               </div>
               <div className="kpi-card">
-                <div className="kpi-lbl">{t('失败请求')}</div>
+                <div className="kpi-lbl">{t('失败事件')}</div>
                 <div className="kpi-body"><div className="kpi-val">{fmt(stats.failedRequests)}</div></div>
                 <div className="kpi-sub">{t('错误率')} {stats.errorRate}%</div>
               </div>
@@ -123,7 +123,7 @@ export default function Overview() {
                 </thead>
                 <tbody>
                   {rows.length === 0 && (
-                    <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>{t('暂无请求')}</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>{t('暂无事件')}</td></tr>
                   )}
                   {rows.map((r) => {
                     const slow = r.type === 'request' && r.dur > 300

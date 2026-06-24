@@ -147,7 +147,7 @@ export const api = {
   /**
    * Failed-requests list.
    * `GET /__clockwork/failures?limit=&type=&status=&search=&since=` → array of failed request
-   * summaries. `limit` is clamped server-side to 1..100. Reserved for the 失败请求 nav item.
+   * summaries. `limit` is clamped server-side to 1..100. Reserved for the 失败事件 nav item.
    */
   failures(params = {}) {
     const q = new URLSearchParams(params).toString()
@@ -277,6 +277,7 @@ export function toListRow(r) {
     dur: num(r.responseDuration),
     mem: r.memoryUsage ? num(r.memoryUsage) / 1e6 : 0,
     time: fmtDateTimeSec(r.time),
+    ts: num(r.time),
     failed: requestFailed(r),
   }
 }
@@ -295,6 +296,7 @@ export function toFailureRow(f) {
     dur: num(f.duration),
     mem: null,
     time: fmtDateTimeSec(f.receivedAt),
+    ts: num(f.receivedAt),
     failed: true,
     failureMsg: f.title || f.rootMessage || '',
   }

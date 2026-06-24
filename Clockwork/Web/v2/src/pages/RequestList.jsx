@@ -21,7 +21,7 @@ export default function RequestList() {
   const { t } = useApp()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  // ?type=failed switches this page to the failures endpoint (the 失败请求 nav item), so the list
+  // ?type=failed switches this page to the failures endpoint (the 失败事件 nav item), so the list
   // matches the sidebar badge instead of just re-rendering the recent-100 list.
   const failedMode = params.get('type') === 'failed'
   const [activeType, setActiveType] = useState('all')
@@ -66,7 +66,10 @@ export default function RequestList() {
       const q = search.toLowerCase()
       r = r.filter(x => x.uri.toLowerCase().includes(q) || (x.controller || '').toLowerCase().includes(q) || (x.failureMsg || '').toLowerCase().includes(q))
     }
-    return r
+    // Default order: most-recent first by occurrence time. The backend already returns rows newest
+    // first (latest + previous ORDER BY id DESC), but we sort explicitly so the default is guaranteed
+    // by the UI regardless of paging or backend changes.
+    return [...r].sort((a, b) => (b.ts || 0) - (a.ts || 0))
   }, [rows, activeType, search, failedMode])
 
   // Stagger rows whenever the filtered set changes.
@@ -100,7 +103,7 @@ export default function RequestList() {
 
       <main className="main">
         <div className="topbar" ref={topbarRef}>
-          <h1>{failedMode ? t('失败请求') : t('请求列表')}</h1>
+          <h1>{failedMode ? t('失败事件') : t('事件列表')}</h1>
           {!failedMode && (
             <div className="filter-group">
               {TYPE_FILTERS.map(f => (
@@ -151,7 +154,7 @@ export default function RequestList() {
                 <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载失败')}：{error}</div><div className="empty-sub">/__clockwork/{failedMode ? 'failures' : 'latest'}</div></div></td></tr>
               )}
               {!loading && !error && filtered.length === 0 && (
-                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{failedMode ? t('暂无失败请求') : t('暂无请求')}</div></div></td></tr>
+                <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{failedMode ? t('暂无失败事件') : t('暂无事件')}</div></div></td></tr>
               )}
               {!loading && !error && filtered.map(r => {
                 const { cls, widthPx } = durBar(r.dur)

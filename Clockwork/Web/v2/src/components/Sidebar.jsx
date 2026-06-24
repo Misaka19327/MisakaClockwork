@@ -52,7 +52,7 @@ function useStats() {
 }
 
 // The sidebar renders the same set of nav items on every page; only the active highlight follows
-// the current route. This keeps the left rail identical across 请求列表 / 操作中心 / 请求详情.
+// the current route. This keeps the left rail identical across 事件列表 / 操作中心 / 请求详情.
 export default function Sidebar() {
   const { t } = useApp()
   const stats = useStats()
@@ -83,11 +83,11 @@ export default function Sidebar() {
           <Icon name="grid" size={14} /> <span>{t('总览')}</span>
         </Link>
         <Link to="/requests" className={reqActive ? 'active' : ''}>
-          <Icon name="list" size={14} /> <span>{t('请求列表')}</span>
+          <Icon name="list" size={14} /> <span>{t('事件列表')}</span>
           <span className="nav-badge">{reqBadge}</span>
         </Link>
         <Link to="/requests?type=failed" className={failedActive ? 'active' : ''}>
-          <Icon name="warning" size={14} /> <span>{t('失败请求')}</span>
+          <Icon name="warning" size={14} /> <span>{t('失败事件')}</span>
           <span className="nav-badge">{failedBadge}</span>
         </Link>
 

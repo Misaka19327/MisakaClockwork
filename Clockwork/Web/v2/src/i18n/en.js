@@ -23,7 +23,7 @@ export const EN = {
   '最后收集': 'Last Collected',
   '秒前': 's ago',
   '请求总数': 'Total Requests',
-  '失败请求': 'Failed Requests',
+  '失败事件': 'Failed Events',
   '平均耗时': 'Avg Duration',
   '数据库查询': 'Database Queries',
   '较昨日': 'vs yesterday',
@@ -47,7 +47,7 @@ export const EN = {
 
   // ── sidebar ──
   '总览': 'Overview',
-  '请求列表': 'Request List',
+  '事件列表': 'Event List',
   '请求详情': 'Request Detail',
   '操作中心': 'Operations',
   '数据库': 'Database',
@@ -204,7 +204,8 @@ export const EN = {
   // ── async states ──
   '加载中…': 'Loading…',
   '加载失败': 'Failed to load',
-  '暂无请求': 'No requests',
+  '暂无事件': 'No events',
+  '暂无失败事件': 'No failed events',
   '请求未找到': 'Request not found',
   '重试': 'Retry',
 }
