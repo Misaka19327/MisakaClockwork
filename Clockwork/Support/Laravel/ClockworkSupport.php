@@ -198,15 +198,26 @@ class ClockworkSupport
         $statuses = $this->csvInput($input['status'] ?? []);
         $search = trim((string)($input['search'] ?? ''));
         $since = isset($input['since']) ? (float)$input['since'] : null;
+        $cursorParam = isset($input['cursor']) ? (string)$input['cursor'] : null;
 
         $failures = [];
         $storage = $this->app['clockwork']->storage();
-        $cursor = $storage->latest();
+
+        // 从 latest 起,或从 cursor 的上一条续扫(cursor 请求已在前一页处理过)。
+        if ($cursorParam !== null) {
+            $before = $storage->previous($cursorParam, 1);
+            $cursor = count($before) ? $before[0] : null;
+        } else {
+            $cursor = $storage->latest();
+        }
+
+        $nextCursor = null;
 
         while ($cursor) {
             $request = $cursor;
             $previous = $storage->previous($request->id, 1);
             $cursor = count($previous) ? $previous[0] : null;
+            $nextCursor = $request->id; // 记录扫描进度,供下一页续传
 
             if (!$this->requestHasFailures($request)) continue;
             if (count($types) && !in_array($request->type, $types)) continue;
@@ -230,7 +241,10 @@ class ClockworkSupport
             if (count($failures) >= $limit) break;
         }
 
-        return new JsonResponse($failures);
+        // 扫到尽头:没有下一页。
+        if ($cursor === null) $nextCursor = null;
+
+        return new JsonResponse(['failures' => $failures, 'nextCursor' => $nextCursor]);
     }
 
     // Resolves the framework data source from the container
