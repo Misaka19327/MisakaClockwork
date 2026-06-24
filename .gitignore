@@ -14,3 +14,6 @@
 
 # Worktree scratch directory (isolated feature workspaces)
 /.worktrees/
+
+# SDD progress ledger (scratch)
+/.superpowers/
