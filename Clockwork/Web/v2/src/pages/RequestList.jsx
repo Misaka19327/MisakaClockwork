@@ -59,7 +59,7 @@ export default function RequestList() {
     return { items, nextPageState: { lastId: items.length ? items[items.length - 1].id : null }, hasMore: items.length === batchSize }
   }, [failedMode, typeParam])
 
-  const { items: rows, pending, loading, joining, phase, error, hasMore, reload, loadMore, sentinelRef, revealRegionRef } = usePagedList({ fetch, batchSize: 50, rootRef: scrollRef })
+  const { items: rows, loading, error, hasMore, reload, loadMore, sentinelRef } = usePagedList({ fetch, batchSize: 50, rootRef: scrollRef })
 
   // Server-side reset when the type filter or failure mode changes. The hook's own mount effect
   // already fires the initial batch, so we skip the first run here to avoid a double initial fetch.
@@ -77,20 +77,11 @@ export default function RequestList() {
       const q = search.toLowerCase()
       r = r.filter(x => x.uri.toLowerCase().includes(q) || (x.controller || '').toLowerCase().includes(q) || (x.failureMsg || '').toLowerCase().includes(q))
     }
-    // Newest-first is already guaranteed by the backend (latest + previous ORDER BY id DESC, and
-    // /failures returns newest first); we preserve paging order rather than re-sorting.
     return r
   }, [rows, search])
 
-  const filteredPending = useMemo(() => {
-    if (!search.trim()) return pending
-    const q = search.toLowerCase()
-    return pending.filter(x => x.uri.toLowerCase().includes(q) || (x.controller || '').toLowerCase().includes(q) || (x.failureMsg || '').toLowerCase().includes(q))
-  }, [pending, search])
-
   const prevLenRef = useRef(0)
-  // Entrance only on a fresh (re)load (0 → N). Appends (N → N+M) are animated by the reveal
-  // slide-in, so we must not re-stagger the whole list on every append commit.
+  // Entrance only on a fresh (re)load (0 → N); appends just appear at the bottom (no re-stagger).
   useEffect(() => {
     const len = rows.length
     const fresh = len > 0 && prevLenRef.current === 0
@@ -196,34 +187,8 @@ export default function RequestList() {
                 )
               })}
             </tbody>
-            {filteredPending.length > 0 && (
-              <tbody ref={revealRegionRef} className="pending-tbody">
-                <tr className="pending-hint"><td colSpan={7}>{`${t('已加载')} ${filteredPending.length} ${t('条 · 即将拼接')}`}</td></tr>
-                {filteredPending.map(r => {
-                  const { cls, widthPx } = durBar(r.dur)
-                  const slow = r.dur > 500
-                  return (
-                    <tr
-                      key={`p-${r.id}`}
-                      className={`pending-row${r.failed ? ' row-failed' : ''}`}
-                      onClick={() => navigate(`/requests/${r.id}`)}
-                    >
-                      <td>{r.failed && <span className="fail-dot" />}<StatusBadge status={r.status} exit={r.type === 'command'} /></td>
-                      <td><TypeBadge type={r.type} size={11} /></td>
-                      <td className="cell-method">{r.method}</td>
-                      <td className="cell-uri" title={r.failureMsg || r.uri}>{r.uri}</td>
-                      <td className={`cell-dur${slow ? ' slow' : ''}`}>
-                        <span className={`dur-bar ${cls}`} style={{ width: widthPx }}>&nbsp;</span>{durStr(r.dur)}
-                      </td>
-                      <td className="cell-memory">{memStr(r.mem)}</td>
-                      <td className="cell-time">{r.time}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            )}
             <tbody className="footer-tbody">
-              {loading && filteredPending.length === 0 && rows.length > 0 && (
+              {loading && rows.length > 0 && (
                 <tr><td colSpan={7}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>
               )}
               {loading && rows.length === 0 && (
