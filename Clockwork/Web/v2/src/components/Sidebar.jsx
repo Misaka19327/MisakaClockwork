@@ -116,8 +116,8 @@ export default function Sidebar() {
           <span className="dot" />
           {t('已连接')} — {t('收集')} {reqBadge} {t('条请求')}
         </div>
-        <div className="util-toggles" style={{ marginTop: 8 }}>
-          <UtilToggles />
+        <div style={{ marginTop: 8 }}>
+          <UtilToggles placement="up" />
         </div>
       </div>
     </aside>

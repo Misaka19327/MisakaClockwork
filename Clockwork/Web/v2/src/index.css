@@ -40,6 +40,9 @@ html[data-theme="dark"] {
   --pill-bg: oklch(22% 0.012 250);
 }
 
+/* Global proportional UI scaling (set from AppContext as --app-zoom). */
+html { zoom: var(--app-zoom, 1); }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root { height: 100%; }
@@ -317,7 +320,7 @@ html[data-theme="dark"] .detail-panel { background: oklch(20% 0.01 250) !importa
 /* ═══════════════════════════════════════════
    Util toggles (theme + lang) — from shared.css
    ═══════════════════════════════════════════ */
-.util-toggles { display: inline-flex; gap: 4px; align-items: center; }
+.util-toggles { display: inline-flex; gap: 4px; align-items: center; position: relative; }
 .util-toggles .toggle-btn { font-family: var(--font-mono); font-size: 10px; font-weight: 510; padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; letter-spacing: 0.04em; transition: all 0.15s; line-height: 1.5; }
 .util-toggles .toggle-btn:hover { border-color: var(--fg); color: var(--fg); }
 .util-toggles .toggle-btn.active { background: var(--accent); color: oklch(15% 0.02 150); border-color: var(--accent); }
@@ -326,6 +329,26 @@ html[data-theme="dark"] .detail-panel { background: oklch(20% 0.01 250) !importa
 .sidebar .util-toggles .toggle-btn:hover { border-color: oklch(60% 0.01 250); color: #fff; }
 .sidebar .util-toggles .toggle-btn.active { background: var(--accent); color: oklch(15% 0.02 150); border-color: var(--accent); }
 .sidebar .util-sep { background: oklch(30% 0.01 250); }
+
+/* ── Settings popover (font-size / theme / language) ── */
+.settings-popover {
+  position: absolute; z-index: 60;
+  min-width: 210px; padding: 10px 12px; margin: 6px 0;
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 6px 20px color-mix(in oklch, var(--fg) 14%, transparent);
+  display: flex; flex-direction: column; gap: 8px;
+  font-size: 12px; white-space: nowrap;
+}
+.settings-popover[data-placement="down"] { top: 100%; right: 0; }
+.settings-popover[data-placement="up"] { bottom: 100%; left: 0; }
+.settings-row { display: flex; align-items: center; gap: 8px; }
+.settings-label { width: 30px; flex-shrink: 0; color: var(--muted); font-size: 11px; letter-spacing: 0.04em; }
+.settings-slider { flex: 1; min-width: 90px; accent-color: var(--accent); cursor: pointer; height: 14px; }
+.settings-pct { min-width: 34px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--fg); }
+.settings-reset { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1; }
+.settings-reset:hover { color: var(--fg); }
+.settings-popover .toggle-btn { flex: 0 0 auto; }
 
 /* ═══════════════════════════════════════════
    KV pairs (request-detail overview)

@@ -7,6 +7,15 @@ export const EN = {
   'Clockwork v5.x ·': 'Clockwork v5.x ·',
   'local': 'local',
 
+  // ── settings popover ──
+  '设置': 'Settings',
+  '字号': 'Font size',
+  '主题': 'Theme',
+  '语言': 'Language',
+  '浅色': 'Light',
+  '深色': 'Dark',
+  '重置': 'Reset',
+
   // ── login ──
   '访问密钥': 'Access Key',
   '输入 Clockwork 密钥以继续': 'Enter Clockwork key to continue',
