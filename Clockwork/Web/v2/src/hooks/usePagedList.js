@@ -39,8 +39,6 @@ export function usePagedList({ fetch, batchSize = 50, rootRef = null, enabled = 
     const region = revealRegionRef.current
     const root = rootRef?.current
     const snap = pendingRef.current
-    pendingRef.current = []             // snapshot + release; arrivals during anim start a fresh cycle
-    setPending([])
     if (!snap.length) return
 
     let visible = false
@@ -51,15 +49,25 @@ export function usePagedList({ fetch, batchSize = 50, rootRef = null, enabled = 
     }
 
     if (visible && motionOk()) {
+      // Keep pending mounted so GSAP can animate the rows — clearing now would unmount the very
+      // nodes we tween (a flash). Commit + clear on completion. Committing pendingRef.current
+      // (not just `snap`) also folds in any rows from a fetch that was in-flight when join fired
+      // and resolves mid-animation, instead of dropping them.
       setJoining(true)
       gsap.fromTo(
         region.querySelectorAll('tr'),
         { y: 40, opacity: 0.55 },
         { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out', onComplete: () => {
-          setItems(prev => [...prev, ...snap]); setJoining(false)
+          setItems(prev => [...prev, ...pendingRef.current])
+          pendingRef.current = []
+          setPending([])
+          setJoining(false)
         } }
       )
     } else {
+      // Off-screen / reduced-motion: instant commit + clear, no animation.
+      pendingRef.current = []
+      setPending([])
       setItems(prev => [...prev, ...snap])
     }
   }, [rootRef])

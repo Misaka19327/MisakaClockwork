@@ -446,9 +446,11 @@ export default function Operations() {
     reload()
   }, [currentCat, timeWindow, reqType, reload])
 
-  // Search + column sort stay client-side over the already-loaded (paged) items.
-  const rows = useMemo(() => {
-    let r = (items || []).slice()
+  // Search + column sort stay client-side over the already-loaded (paged) rows. Shared by the
+  // committed list and the pending (reveal) segment so what's shown pending matches what remains
+  // after join — otherwise filtered/sorted rows would pop in or out when a batch is joined.
+  const applyFilterSort = useCallback((arr) => {
+    let r = (arr || []).slice()
     if (filterSearch.trim()) {
       const q = filterSearch.toLowerCase()
       r = r.filter(row => {
@@ -475,7 +477,9 @@ export default function Operations() {
       })
     }
     return r
-  }, [items, currentCat, filterSearch, sortCol, sortDir])
+  }, [currentCat, filterSearch, sortCol, sortDir])
+  const rows = useMemo(() => applyFilterSort(items), [applyFilterSort, items])
+  const pendingRows = useMemo(() => applyFilterSort(pending), [applyFilterSort, pending])
 
   const prevLenRef = useRef(0)
   // Entrance only on a fresh (re)load (0 → N). Appends (N → N+M) are animated by the reveal
@@ -659,10 +663,10 @@ export default function Operations() {
                 return [main, detail]
               })}
             </tbody>
-            {pending.length > 0 && (
+            {pendingRows.length > 0 && (
               <tbody ref={revealRegionRef} className="pending-tbody">
-                <tr className="pending-hint"><td colSpan={ui.cols.length}>{`${t('已加载')} ${pending.length} ${t('条 · 即将拼接')}`}</td></tr>
-                {pending.flatMap((d, i) => (
+                <tr className="pending-hint"><td colSpan={ui.cols.length}>{`${t('已加载')} ${pendingRows.length} ${t('条 · 即将拼接')}`}</td></tr>
+                {pendingRows.flatMap((d, i) => (
                   <tr key={`p-${i}`} className="pending-row">
                     {ui.cols.map(col => <Fragment key={col.id}>{renderCellTd(col, d)}</Fragment>)}
                   </tr>
