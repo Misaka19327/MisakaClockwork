@@ -580,13 +580,12 @@ export default function Operations() {
         </div>
 
         <div className="kpi-band" ref={kpiRef}>
-          {loading && <div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div>}
-          {!loading && error && <div className="op-empty"><div className="empty-text">{t('加载失败')}：{error}</div></div>}
-          {!loading && !error && kpis && <KpiBand cat={currentCat} c={kpis} t={t} />}
+          {loading && !kpis && <div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div>}
+          {error && !kpis && <div className="op-empty"><div className="empty-text">{t('加载失败')}：{error}</div></div>}
+          {kpis && <KpiBand cat={currentCat} c={kpis} t={t} />}
         </div>
 
-        {!loading && !error && (
-          <div className="filter-bar">
+        <div className="filter-bar">
             <span className="flbl">{t('时间窗')}</span>
             <select value={timeWindow} onChange={(e) => setTimeWindow(e.target.value)}>
               <option value="15m">{t('最近 15 分钟')}</option>
@@ -615,7 +614,6 @@ export default function Operations() {
               {t('共')} {rows.length} {t('条')}{t('（共')}{fmt(total)}{t('条')}{t('）')}
             </span>
           </div>
-        )}
 
         <div className="table-wrap" ref={scrollRef}>
           <table className="op-table">
