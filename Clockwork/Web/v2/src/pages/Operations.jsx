@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
 import { gsap, motionOk } from '../lib/motion.js'
+import { prettyVal } from '../lib/format.js'
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { ExpandableCode, ExpandableTrace } from '../components/ExpandableCode.jsx'
@@ -86,7 +87,7 @@ const CATEGORY_UI = {
 
 const WINDOW_SECONDS = { '15m': 900, '1h': 3600, '24h': 86400, '7d': 604800 }
 
-const FULL_FIELDS = new Set(['SQL', 'SQL 完整语句', '绑定值', '载荷', '内容', '调用栈', '上下文', '参数', '值', '消息'])
+const FULL_FIELDS = new Set(['SQL', 'SQL 完整语句', '绑定值', '结果', '载荷', '内容', '调用栈', '上下文', '参数', '值', '消息'])
 
 const fmt = (n) => Number(n || 0).toLocaleString()
 // Real log/event/notification entries carry `time` as a unix float; format it to a clock.
@@ -330,6 +331,7 @@ function detailFields(cat, d, t, goRequest) {
         [t('来源'), d.file],
         [t('请求'), req()],
         [t('绑定值'), <ExpandableCode text={JSON.stringify(d.bindings || {}, null, 2)} label={t('展开绑定值 ▼')} />],
+        [t('结果'), d.resultAvailable ? <ExpandableCode text={prettyVal(d.result) ?? ''} /> : <span style={{ color: 'var(--muted)' }}>{d.resultUnavailableReason || t('未捕获查询结果')}</span>],
         [t('SQL 完整语句'), <ExpandableCode text={d.query} />],
         [t('调用栈'), <ExpandableTrace trace={d.trace || null} />],
         [t('标签'), (d.tags || []).length ? d.tags.map(tg => <span key={tg} className={tg === 'slow' ? 'tag-slow' : 'tag-n1'}>{tg}</span>) : '—'],
@@ -338,7 +340,7 @@ function detailFields(cat, d, t, goRequest) {
       return [
         [t('类型'), <span className={`cache-type-badge ${d.type}`}>{(d.type || '').toUpperCase()}</span>],
         [t('键'), <code>{d.key}</code>],
-        [t('值'), d.value ? <ExpandableCode text={d.value} /> : '—'],
+        [t('值'), d.value ? <ExpandableCode text={prettyVal(d.value) ?? '—'} /> : '—'],
         [t('耗时'), `${Number(d.duration || 0).toFixed(2)} ms`],
         [t('连接/存储'), d.connection],
         [t('过期时间'), d.expiration ? `${d.expiration}s` : '—'],
