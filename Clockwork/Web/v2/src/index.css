@@ -284,7 +284,8 @@ html[data-theme="dark"] .row-failed:hover { background: oklch(22% 0.04 25) !impo
 
 /* Expandable code blocks + trace (operations detail) */
 .code-block { font-family: var(--font-mono); font-size: 11px; line-height: 1.55; background: oklch(96% 0.004 250); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; position: relative; }
-.code-preview { padding: 8px 10px; white-space: pre-wrap; word-break: break-all; max-height: 68px; overflow: hidden; position: relative; }
+.code-preview { padding: 8px 10px; white-space: pre-wrap; word-break: break-all; position: relative; }
+.code-preview.has-more { max-height: 68px; overflow: hidden; }
 .code-preview.has-more::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 28px; background: linear-gradient(transparent, oklch(96% 0.004 250)); }
 .code-full { padding: 8px 10px; white-space: pre-wrap; word-break: break-all; max-height: 420px; overflow: auto; display: none; }
 .code-block.expanded .code-preview { display: none; }
@@ -311,6 +312,7 @@ html[data-theme="dark"] .detail-panel { background: oklch(20% 0.01 250) !importa
 .detail-item .dk { font-family: var(--font-mono); font-size: 10px; color: var(--muted); min-width: 80px; letter-spacing: 0.02em; padding-top: 2px; flex-shrink: 0; }
 .detail-item .dv { font-family: var(--font-mono); font-size: 11px; word-break: break-all; min-width: 0; }
 .detail-item.full { grid-column: 1 / -1; }
+.detail-item.full .dv { flex: 1; }
 .detail-actions { margin-top: 12px; display: flex; gap: 8px; }
 .detail-actions .btn { font-family: var(--font-body); font-size: 12px; padding: 5px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--fg); cursor: pointer; letter-spacing: 0.01em; display: inline-flex; align-items: center; gap: 5px; transition: background 0.12s; }
 .detail-actions .btn:hover { background: var(--bg); }
