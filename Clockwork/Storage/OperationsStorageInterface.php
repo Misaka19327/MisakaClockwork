@@ -6,8 +6,9 @@
 interface OperationsStorageInterface
 {
     // Return operations for a category, as flat rows each carrying an originating-request
-    // back-reference. Supports an optional Search (request-level filtering) and a row limit.
-    public function operations($category, ?Search $search = null, $limit = null);
+    // back-reference. Supports an optional Search (request-level filtering), a row limit, and an
+    // offset (for paged access — keep in lockstep with SqlStorage::operations and the controller).
+    public function operations($category, ?Search $search = null, $limit = null, $offset = 0);
 
     // Return single-category KPIs (counts, duration aggregates, sub-type breakdowns), aligned
     // with the buildOperationsKpis shape used by the operations center.

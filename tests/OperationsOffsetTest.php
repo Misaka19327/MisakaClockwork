@@ -65,7 +65,40 @@ function testOperationsOffsetZeroEqualsDefault()
     }
 }
 
-$tests = ['testOperationsOffsetSkipsFirstPage', 'testOperationsOffsetZeroEqualsDefault'];
+// Offset paging must be stable across equal timestamps: a single request's operations all share
+// that request's `time`, so only a (time, request_id, seq) total order keeps them from swapping
+// between pages (which would duplicate or drop rows).
+function testOperationsOffsetStableOrderAcrossSameTimestamp()
+{
+    [$storage, $path] = makeSqlStorage();
+    try {
+        $req = new Request([
+            'id' => 'r-same', 'time' => 500.0, 'method' => 'GET', 'uri' => '/same',
+            'responseStatus' => 200, 'responseDuration' => 5.0,
+            'databaseQueries' => [
+                ['query' => 'select a', 'duration' => 1.0, 'connection' => 'mysql', 'file' => 'x.php', 'line' => 1],
+                ['query' => 'select b', 'duration' => 1.0, 'connection' => 'mysql', 'file' => 'x.php', 'line' => 2],
+                ['query' => 'select c', 'duration' => 1.0, 'connection' => 'mysql', 'file' => 'x.php', 'line' => 3],
+            ],
+        ]);
+        $storage->store($req);
+
+        $page = function ($offset) use ($storage) {
+            return array_map(function ($o) { return $o['query']; }, $storage->operations('database', null, 1, $offset));
+        };
+
+        // time DESC, request_id DESC, seq DESC → highest seq first: 'select c','select b','select a'.
+        assertSameStrict(['select c'], $page(0), 'offset 0 must be the highest-seq op (seq DESC tiebreak).');
+        assertSameStrict(['select b'], $page(1), 'offset 1 must be the middle op.');
+        assertSameStrict(['select a'], $page(2), 'offset 2 must be the lowest-seq op.');
+        assertSameStrict([], $storage->operations('database', null, 1, 3), 'offset past the end returns nothing.');
+    } finally {
+        $storage->cleanup(true);
+        if (is_file($path)) @unlink($path);
+    }
+}
+
+$tests = ['testOperationsOffsetSkipsFirstPage', 'testOperationsOffsetZeroEqualsDefault', 'testOperationsOffsetStableOrderAcrossSameTimestamp'];
 $failures = 0;
 foreach ($tests as $test) {
     try { $test(); echo "[PASS] {$test}\n"; }

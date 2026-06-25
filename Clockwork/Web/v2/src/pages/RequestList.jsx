@@ -34,9 +34,10 @@ export default function RequestList() {
   const scrollRef = useRef(null)
 
   // Type filtering is server-side: 'all' omits the type param; anything else is forwarded to
-  // latest/previous (and to /failures, which already accepts type). Switching type therefore has
-  // to reset paging from page 0 — handled by the reload effect below.
-  const typeParam = activeType === 'all' ? {} : { type: activeType }
+  // latest/previous. The failures list has no type filter UI, so failedMode always sends {} —
+  // otherwise a type chosen on the event list would silently filter the failures list too.
+  // Switching type (on the event list) resets paging from page 0 (reload effect below).
+  const typeParam = failedMode ? {} : (activeType === 'all' ? {} : { type: activeType })
 
   const fetch = useCallback(async (pageState, batchSize) => {
     if (failedMode) {

@@ -277,7 +277,10 @@ class SqlStorage extends Storage implements OperationsStorageInterface
             $sql .= " AND request_id IN ({$placeholder})";
             $bindings = array_merge($bindings, $inBindings);
         }
-        $sql .= " ORDER BY time DESC";
+        // Stable total order: time alone is not unique (every op in a request shares the
+        // request's time), so offset paging needs the (request_id, seq) tiebreak or equal-time
+        // rows can swap places across pages → duplicates / gaps.
+        $sql .= " ORDER BY time DESC, request_id DESC, seq DESC";
         if ($limit) {
             $sql .= " LIMIT {$limit}";
             if ($offset) $sql .= " OFFSET {$offset}";
