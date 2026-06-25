@@ -48,3 +48,42 @@ export function esc(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
+
+// If a string is a JSON object/array — directly (`{"a":1}` / `[1,2]`) or a JSON string literal
+// wrapping one (`"[{\"a\":1}]"`) — return it pretty-printed; otherwise return the original string
+// unchanged (scalars, PHP-serialized blobs, malformed JSON pass through).
+export function prettyJsonValue(raw) {
+  if (raw == null) return raw
+  const s = String(raw).trim()
+  if (!s) return s
+  const tryFormat = (str) => {
+    if (!str || (str[0] !== '{' && str[0] !== '[')) return null
+    try {
+      const parsed = JSON.parse(str)
+      return parsed && typeof parsed === 'object' ? JSON.stringify(parsed, null, 2) : null
+    } catch (_) { return null }
+  }
+  const direct = tryFormat(s)
+  if (direct != null) return direct
+  // A JSON string literal ("...") may wrap a JSON object/array — decode one level and retry.
+  if (s.length >= 2 && s[0] === '"' && s[s.length - 1] === '"') {
+    try {
+      const inner = JSON.parse(s)
+      if (typeof inner === 'string') {
+        const unwrapped = tryFormat(inner.trim())
+        if (unwrapped != null) return unwrapped
+      }
+    } catch (_) { /* not a JSON string literal */ }
+  }
+  return s
+}
+
+// Pretty-print any value for code-block display: objects/arrays → indented JSON; strings →
+// prettyJsonValue (beautifies embedded JSON, leaves the rest); null → null.
+export function prettyVal(v) {
+  if (v == null) return null
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v, null, 2) } catch (_) { return String(v) }
+  }
+  return prettyJsonValue(v)
+}

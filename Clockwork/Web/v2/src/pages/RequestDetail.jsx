@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
 import { gsap, motionOk } from '../lib/motion.js'
-import { statusClass } from '../lib/format.js'
+import { statusClass, prettyVal } from '../lib/format.js'
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { api, toDetail } from '../api/clockwork.js'
@@ -338,6 +338,7 @@ function DatabasePanel({ d, t }) {
                       { k: t('模型'), v: q.model || '—' },
                       { k: t('标签'), v: (q.tags && q.tags.length) ? q.tags.map(tg => <span key={tg} className={tg === 'slow' ? 'tag-slow' : 'tag-n1'}>{tg}</span>) : '—' },
                       { k: t('绑定值'), v: <ExpandableCode text={JSON.stringify(q.bindings ?? {}, null, 2)} />, full: true },
+                      { k: t('结果'), v: q.resultAvailable ? <ExpandableCode text={prettyVal(q.result) ?? ''} /> : <span style={{ color: 'var(--muted)' }}>{q.resultUnavailableReason || t('未捕获查询结果')}</span>, full: true },
                       { k: t('调用栈'), v: <ExpandableTrace trace={q.trace || []} />, full: true },
                       { k: t('完整 SQL'), v: <ExpandableCode text={q.query} />, full: true },
                     ]} />
@@ -378,7 +379,7 @@ function CachePanel({ d, t }) {
                   <div className="detail-panel">
                     <DetailFields items={[
                       { k: t('过期'), v: c.expiration ? `${c.expiration} s` : '—' },
-                      { k: t('完整值'), v: <ExpandableCode text={fmtVal(c.value)} />, full: true },
+                      { k: t('完整值'), v: <ExpandableCode text={prettyVal(c.value) ?? '—'} />, full: true },
                     ]} />
                   </div>
                 </td>

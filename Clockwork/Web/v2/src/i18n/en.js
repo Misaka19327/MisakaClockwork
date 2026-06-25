@@ -15,6 +15,8 @@ export const EN = {
   '浅色': 'Light',
   '深色': 'Dark',
   '重置': 'Reset',
+  '结果': 'Result',
+  '未捕获查询结果': 'Query result not captured',
 
   // ── login ──
   '访问密钥': 'Access Key',
