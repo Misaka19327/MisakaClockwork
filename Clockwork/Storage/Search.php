@@ -23,7 +23,10 @@ class Search
     public function __construct($search = [], $options = [])
     {
         foreach (['uri', 'controller', 'method', 'status', 'time', 'received', 'name', 'type'] as $condition) {
-            $this->$condition = $search[$condition] ?? [];
+            // Coerce to array: query params arrive as scalars (e.g. the request-list type filter
+            // sends `type=request`), but the matches* methods and isEmpty() foreach/count over
+            // these — a scalar would make count() throw on PHP 7.2+.
+            $this->$condition = (array)($search[$condition] ?? []);
         }
 
         $this->search = isset($search['search']) ? (string)$search['search'] : '';
