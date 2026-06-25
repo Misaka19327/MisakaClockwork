@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
 import { gsap, motionOk } from '../lib/motion.js'
-import { prettyVal } from '../lib/format.js'
+import { prettyVal, formatSql } from '../lib/format.js'
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { ExpandableCode, ExpandableTrace } from '../components/ExpandableCode.jsx'
@@ -332,7 +332,7 @@ function detailFields(cat, d, t, goRequest) {
         [t('请求'), req()],
         [t('绑定值'), <ExpandableCode text={JSON.stringify(d.bindings || {}, null, 2)} label={t('展开绑定值 ▼')} />],
         [t('结果'), d.resultAvailable ? <ExpandableCode text={prettyVal(d.result) ?? ''} /> : <span style={{ color: 'var(--muted)' }}>{d.resultUnavailableReason || t('未捕获查询结果')}</span>],
-        [t('SQL 完整语句'), <ExpandableCode text={d.query} />],
+        [t('SQL 完整语句'), <ExpandableCode text={formatSql(d.query)} />],
         [t('调用栈'), <ExpandableTrace trace={d.trace || null} />],
         [t('标签'), (d.tags || []).length ? d.tags.map(tg => <span key={tg} className={tg === 'slow' ? 'tag-slow' : 'tag-n1'}>{tg}</span>) : '—'],
       ]

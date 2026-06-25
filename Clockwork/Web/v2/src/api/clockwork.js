@@ -347,6 +347,11 @@ export function toDetail(r) {
     logs: r.log || [],
     events: r.events || [],
     viewsData: r.viewsData || [],
+    modelsActions: r.modelsActions || [],
+    modelsRetrieved: r.modelsRetrieved || {},
+    modelsCreated: r.modelsCreated || {},
+    modelsUpdated: r.modelsUpdated || {},
+    modelsDeleted: r.modelsDeleted || {},
     dbStats: {
       count: num(r.databaseQueriesCount ?? (r.databaseQueries || []).length),
       slow: num(r.databaseSlowQueries),

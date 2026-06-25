@@ -72,3 +72,20 @@ html[data-theme="dark"] .tl-track { background: oklch(24% 0.01 250); }
 .data-table tbody tr.expanded:not(.detail-row) { background: oklch(96% 0.006 250); }
 html[data-theme="dark"] .data-table tbody tr:not(.detail-row):hover { background: oklch(22% 0.012 250) !important; }
 html[data-theme="dark"] .data-table tbody tr.expanded:not(.detail-row) { background: oklch(22% 0.014 250) !important; }
+
+/* ── Models tab ── */
+.empty-text { font-size: 13px; color: var(--muted); padding: 18px; text-align: center; }
+.model-summary { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.model-card { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.model-name { font-family: var(--font-mono); font-weight: 590; color: var(--fg); }
+.model-counts { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.model-chip { font-family: var(--font-mono); font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--pill-bg); }
+.model-chip.retrieved { color: var(--info); }
+.model-chip.created   { color: var(--success); }
+.model-chip.updated   { color: var(--warn); }
+.model-chip.deleted   { color: var(--danger); }
+.model-action-badge { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 590; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.02em; }
+.model-action-badge.retrieved { background: color-mix(in oklch, var(--info) 14%, transparent); color: var(--info); }
+.model-action-badge.created   { background: color-mix(in oklch, var(--success) 14%, transparent); color: var(--success); }
+.model-action-badge.updated   { background: color-mix(in oklch, var(--warn) 14%, transparent); color: var(--warn); }
+.model-action-badge.deleted   { background: color-mix(in oklch, var(--danger) 14%, transparent); color: var(--danger); }

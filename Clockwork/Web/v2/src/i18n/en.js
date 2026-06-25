@@ -18,6 +18,18 @@ export const EN = {
   '结果': 'Result',
   '未捕获查询结果': 'Query result not captured',
 
+  // ── models tab ──
+  '模型操作': 'Model Actions',
+  '检索': 'Retrieved',
+  '新建': 'Created',
+  '更新': 'Updated',
+  '删除': 'Deleted',
+  '主键': 'Key',
+  '改动': 'Changes',
+  '属性': 'Attributes',
+  '关联 SQL': 'Related SQL',
+  '无模型操作流水（默认仅采集写操作）': 'No model actions recorded (writes only by default)',
+
   // ── login ──
   '访问密钥': 'Access Key',
   '输入 Clockwork 密钥以继续': 'Enter Clockwork key to continue',

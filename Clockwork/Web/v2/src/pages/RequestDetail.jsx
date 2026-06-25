@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
 import { gsap, motionOk } from '../lib/motion.js'
-import { statusClass, prettyVal } from '../lib/format.js'
+import { statusClass, prettyVal, formatSql } from '../lib/format.js'
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/Icon.jsx'
 import { api, toDetail } from '../api/clockwork.js'
@@ -13,6 +13,7 @@ const TABS = [
   { key: 'overview', label: '概览', icon: 'grid' },
   { key: 'performance', label: '性能', icon: 'chart', sub: '时间线' },
   { key: 'database', label: '数据库', icon: 'database' },
+  { key: 'models', label: '模型', icon: 'box' },
   { key: 'cache', label: '缓存', icon: 'cache' },
   { key: 'redis', label: 'Redis', icon: 'redis' },
   { key: 'http', label: 'HTTP', icon: 'globe' },
@@ -76,6 +77,8 @@ function fmtClock(unix) {
 function barClass(color) {
   return { blue: 'bar-blue', green: 'bar-green', purple: 'bar-purple', red: 'bar-red' }[color] || 'bar-grey'
 }
+// Sum a model-count map ({ ModelClass: count }) — counts may arrive as strings from storage.
+const sumCounts = (obj) => Object.values(obj || {}).reduce((a, b) => a + (Number(b) || 0), 0)
 
 export default function RequestDetail() {
   const { t } = useApp()
@@ -101,6 +104,7 @@ export default function RequestDetail() {
 
   const counts = d && {
     database: d.dbStats.count,
+    models: sumCounts(d.modelsRetrieved) + sumCounts(d.modelsCreated) + sumCounts(d.modelsUpdated) + sumCounts(d.modelsDeleted),
     cache: d.cacheQueries.length,
     redis: d.redisCommands.length,
     http: d.httpRequests.length,
@@ -201,6 +205,7 @@ export default function RequestDetail() {
             {tab === 'overview' && <OverviewPanel d={d} t={t} />}
             {tab === 'performance' && <PerformancePanel d={d} t={t} bars={bars} pct={pct} />}
             {tab === 'database' && <DatabasePanel d={d} t={t} />}
+            {tab === 'models' && <ModelsPanel d={d} t={t} />}
             {tab === 'cache' && <CachePanel d={d} t={t} />}
             {tab === 'redis' && <RedisPanel d={d} t={t} />}
             {tab === 'http' && <HttpPanel d={d} t={t} />}
@@ -340,13 +345,88 @@ function DatabasePanel({ d, t }) {
                       { k: t('绑定值'), v: <ExpandableCode text={JSON.stringify(q.bindings ?? {}, null, 2)} />, full: true },
                       { k: t('结果'), v: q.resultAvailable ? <ExpandableCode text={prettyVal(q.result) ?? ''} /> : <span style={{ color: 'var(--muted)' }}>{q.resultUnavailableReason || t('未捕获查询结果')}</span>, full: true },
                       { k: t('调用栈'), v: <ExpandableTrace trace={q.trace || []} />, full: true },
-                      { k: t('完整 SQL'), v: <ExpandableCode text={q.query} />, full: true },
+                      { k: t('完整 SQL'), v: <ExpandableCode text={formatSql(q.query)} />, full: true },
                     ]} />
                   </div>
                 </td>
               </tr>
             )]
           })}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+function ModelsPanel({ d, t }) {
+  const [open, toggle] = useToggleSet()
+  const actions = d.modelsActions || []
+  const ACTION_LABEL = { retrieved: '检索', created: '新建', updated: '更新', deleted: '删除' }
+  const allModels = Array.from(new Set([
+    ...Object.keys(d.modelsRetrieved || {}),
+    ...Object.keys(d.modelsCreated || {}),
+    ...Object.keys(d.modelsUpdated || {}),
+    ...Object.keys(d.modelsDeleted || {}),
+  ]))
+  const cnt = (map, m) => Number((d[map] || {})[m] || 0)
+
+  return (
+    <>
+      <div className="section-title">{t('模型操作')} <span className="count">({actions.length})</span></div>
+
+      {allModels.length > 0 && (
+        <div className="model-summary">
+          {allModels.map(m => (
+            <div key={m} className="model-card">
+              <span className="model-name" title={m}>{m.split('\\').pop() || m}</span>
+              <span className="model-counts">
+                {cnt('modelsRetrieved', m) > 0 && <span className="model-chip retrieved">{cnt('modelsRetrieved', m)} {t('检索')}</span>}
+                {cnt('modelsCreated', m) > 0 && <span className="model-chip created">{cnt('modelsCreated', m)} {t('新建')}</span>}
+                {cnt('modelsUpdated', m) > 0 && <span className="model-chip updated">{cnt('modelsUpdated', m)} {t('更新')}</span>}
+                {cnt('modelsDeleted', m) > 0 && <span className="model-chip deleted">{cnt('modelsDeleted', m)} {t('删除')}</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <table className="data-table">
+        <thead><tr><th>#</th><th>{t('模型')}</th><th>{t('操作')}</th><th>{t('主键')}</th><th>{t('耗时')}</th><th>{t('关联 SQL')}</th></tr></thead>
+        <tbody>
+          {actions.flatMap((a, i) => {
+            const isExp = open.has(i)
+            const main = (
+              <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => toggle(i)}>
+                <td className="mono">{i + 1}</td>
+                <td className="mono" title={a.model}>{(a.model || '').split('\\').pop() || '—'}</td>
+                <td><span className={`model-action-badge ${a.action}`}>{t(ACTION_LABEL[a.action] || a.action)}</span></td>
+                <td className="mono">{a.key == null ? '—' : String(a.key)}</td>
+                <td className="dur-cell">{a.duration != null ? `${Number(a.duration).toFixed(1)} ms` : '—'}</td>
+                <td className="sql-cell" title={a.query}>{a.query || '—'}</td>
+              </tr>
+            )
+            if (!isExp) return [main]
+            return [main, (
+              <tr key={`d${i}`} className="detail-row">
+                <td colSpan={6}>
+                  <div className="detail-panel">
+                    <DetailFields items={[
+                      { k: t('模型'), v: <code>{a.model || '—'}</code> },
+                      { k: t('操作'), v: <span className={`model-action-badge ${a.action}`}>{t(ACTION_LABEL[a.action] || a.action)}</span> },
+                      { k: t('主键'), v: a.key == null ? '—' : String(a.key) },
+                      ...(Object.keys(a.changes || {}).length ? [{ k: t('改动'), v: <ExpandableCode text={prettyVal(a.changes)} />, full: true }] : []),
+                      ...(Object.keys(a.attributes || {}).length ? [{ k: t('属性'), v: <ExpandableCode text={prettyVal(a.attributes)} />, full: true }] : []),
+                      { k: t('关联 SQL'), v: a.query ? <ExpandableCode text={formatSql(a.query)} /> : '—', full: true },
+                      { k: t('调用栈'), v: <ExpandableTrace trace={a.trace || []} />, full: true },
+                    ]} />
+                  </div>
+                </td>
+              </tr>
+            )]
+          })}
+          {actions.length === 0 && (
+            <tr><td colSpan={6}><div className="empty-text">{t('无模型操作流水（默认仅采集写操作）')}</div></td></tr>
+          )}
         </tbody>
       </table>
     </>

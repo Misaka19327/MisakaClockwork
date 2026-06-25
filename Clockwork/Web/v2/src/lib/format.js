@@ -87,3 +87,33 @@ export function prettyVal(v) {
   }
   return prettyJsonValue(v)
 }
+
+// Pretty-print a SQL statement: newline before major clauses / joins / logical operators with
+// light indentation. Quoted strings and identifiers are masked first (with an `@@S<n>@@` sentinel
+// that can't appear in SQL) so keywords inside them (e.g. a column named `order`) are never
+// matched and the restore can't collide with numbers already in the statement. Best-effort, not a
+// full parser — function-call argument lists stay on one line (no comma splitting).
+export function formatSql(sql) {
+  if (sql == null) return null
+  let s = String(sql).replace(/\s+/g, ' ').trim()
+  if (!s) return s
+
+  const strings = []
+  s = s.replace(/('(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`[^`]*`)/g, (m) => {
+    const i = strings.push(m) - 1
+    return '@@S' + i + '@@'
+  })
+
+  const clauses = [
+    'UNION ALL', 'INTERSECT ALL', 'EXCEPT ALL', 'UNION', 'INTERSECT', 'EXCEPT',
+    'INNER JOIN', 'LEFT OUTER JOIN', 'RIGHT OUTER JOIN', 'FULL OUTER JOIN', 'CROSS JOIN',
+    'NATURAL JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN', 'JOIN',
+    'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'HAVING', 'ORDER BY', 'LIMIT', 'OFFSET',
+    'VALUES', 'SET', 'RETURNING',
+  ]
+  s = s.replace(new RegExp('\\s+(' + clauses.join('|') + ')(?=\\s)', 'gi'), '\n$1')
+  s = s.replace(/\s+(AND|OR)(?=\s)/gi, '\n    $1')
+  s = s.replace(/\n(JOIN|INNER JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|CROSS JOIN|NATURAL JOIN|LEFT OUTER JOIN|RIGHT OUTER JOIN|FULL OUTER JOIN)\b/gi, '\n  $1')
+
+  return s.replace(/@@S(\d+)@@/g, (_, n) => strings[Number(n)])
+}
