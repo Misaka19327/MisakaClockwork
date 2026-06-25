@@ -8,3 +8,10 @@
 html[data-theme="dark"] .list-table tbody tr:hover { background: oklch(22% 0.012 250) !important; }
 
 .list-table .filter-pill svg { vertical-align: -2px; margin-right: 4px; }
+
+.pending-tbody .pending-hint td { color: var(--muted); font-size: 12px; padding: 6px 12px; }
+.pending-tbody .pending-row { opacity: 0.55; transform: translateY(40px); }
+/* GSAP takes over transform/opacity at join time; reduced-motion users see the end state instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .pending-tbody .pending-row { opacity: 1; transform: none; }
+}

@@ -40,3 +40,10 @@ html[data-theme="dark"] .op-table tbody tr.expanded { background: oklch(22% 0.01
 .op-empty .empty-icon { opacity: 0.3; margin-bottom: 10px; }
 .op-empty .empty-text { font-size: 14px; }
 .op-empty .empty-sub { font-size: 12px; color: oklch(65% 0.01 250); margin-top: 4px; }
+
+.pending-tbody .pending-hint td { color: var(--muted); font-size: 12px; padding: 6px 12px; }
+.pending-tbody .pending-row { opacity: 0.55; transform: translateY(40px); }
+/* GSAP takes over transform/opacity at join time; reduced-motion users see the end state instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .pending-tbody .pending-row { opacity: 1; transform: none; }
+}
