@@ -433,7 +433,7 @@ export default function Operations() {
     return { items, nextPageState: { offset: offset + items.length }, hasMore: offset + items.length < (d?.total ?? 0) }
   }, [currentCat, timeWindow, reqType])
 
-  const { items, pending, loading, joining, phase, error, hasMore, reload, loadMore, sentinelRef, revealRegionRef } = usePagedList({ fetch, batchSize: 50, rootRef: scrollRef })
+  const { items, loading, error, hasMore, reload, loadMore, sentinelRef } = usePagedList({ fetch, batchSize: 50, rootRef: scrollRef })
 
   // Reset paging from offset 0 when a primitive filter changes. The hook's own mount effect
   // already fires the initial batch (its `reload` is memoized on batchSize only, so depending on
@@ -485,7 +485,6 @@ export default function Operations() {
     return r
   }, [currentCat, filterSearch, sortCol, sortDir])
   const rows = useMemo(() => applyFilterSort(items), [applyFilterSort, items])
-  const pendingRows = useMemo(() => applyFilterSort(pending), [applyFilterSort, pending])
 
   const prevLenRef = useRef(0)
   // Entrance only on a fresh (re)load (0 → N). Appends (N → N+M) are animated by the reveal
@@ -669,16 +668,6 @@ export default function Operations() {
                 return [main, detail]
               })}
             </tbody>
-            {pendingRows.length > 0 && (
-              <tbody ref={revealRegionRef} className="pending-tbody">
-                <tr className="pending-hint"><td colSpan={ui.cols.length}>{`${t('已加载')} ${pendingRows.length} ${t('条 · 即将拼接')}`}</td></tr>
-                {pendingRows.flatMap((d, i) => (
-                  <tr key={`p-${i}`} className="pending-row">
-                    {ui.cols.map(col => <Fragment key={col.id}>{renderCellTd(col, d)}</Fragment>)}
-                  </tr>
-                ))}
-              </tbody>
-            )}
             <tbody className="footer-tbody">
               {loading && items.length > 0 && (
                 <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>

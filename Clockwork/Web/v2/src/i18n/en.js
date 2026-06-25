@@ -209,6 +209,4 @@ export const EN = {
   '没有更早的记录了': 'No older records',
   '请求未找到': 'Request not found',
   '重试': 'Retry',
-  '已加载': 'Loaded',
-  '条 · 即将拼接': ' rows · joining soon',
 }
