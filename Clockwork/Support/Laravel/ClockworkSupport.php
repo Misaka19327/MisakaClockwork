@@ -78,6 +78,14 @@ class ClockworkSupport
             $data = $only ? $data->only(array_diff($only, ['updateToken'])) : $data->except(array_merge($except, ['updateToken']));
         }
 
+        // JsonResponse(null) serializes to "{}", which the client reads as a truthy empty object —
+        // indistinguishable from a real request. For the `latest` endpoint this produces
+        // /{undefined}/previous/{count} 404s when no request matches the filter (e.g. type=command
+        // with no commands recorded). Return a real JSON null so the client's `if (!latest)` guard fires.
+        if ($data === null) {
+            return new JsonResponse('null', 200, ['Content-Type' => 'application/json'], true);
+        }
+
         return new JsonResponse($data);
     }
 

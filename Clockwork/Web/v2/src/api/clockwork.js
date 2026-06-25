@@ -166,7 +166,9 @@ export const api = {
    */
   async recent(count = 50, params = {}) {
     const latest = await this.latest(params)
-    if (!latest) return []
+    // `latest` may come back as null (no matching request) or as {} if a backend path returned an
+    // empty object — guard on a real id so we never page from an undefined anchor.
+    if (!latest || latest.id == null) return []
     const older = await this.previous(latest.id, Math.max(0, count - 1), params)
     return [latest, ...(Array.isArray(older) ? older : [])]
   },
