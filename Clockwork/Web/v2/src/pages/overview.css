@@ -1,6 +1,6 @@
 /* Overview (index) page — ported from index.html. */
 
-.overview-page { display: flex; flex-direction: column; min-height: 100vh; }
+.overview-page { display: flex; flex-direction: column; min-height: calc(100vh / var(--app-zoom, 1)); }
 
 /* ── Top nav ── */
 .topnav { display: flex; align-items: center; gap: 14px; padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }

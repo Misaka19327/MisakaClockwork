@@ -11,7 +11,7 @@
   --login-heading: oklch(92% 0.005 250);
   --login-muted: oklch(55% 0.012 250);
 
-  min-height: 100vh;
+  min-height: calc(100vh / var(--app-zoom, 1));
   display: flex; align-items: center; justify-content: center;
   background: var(--login-bg);
   transition: background 0.3s ease;
@@ -44,7 +44,7 @@ html[data-theme="dark"] .login-page::before {
 
 .login-card {
   position: relative; z-index: 1;
-  width: 400px; max-width: calc(100vw - 32px);
+  width: 400px; max-width: calc((100vw - 32px) / var(--app-zoom, 1));
   background: var(--login-card-bg);
   border: 1px solid var(--login-card-border);
   border-radius: 10px;

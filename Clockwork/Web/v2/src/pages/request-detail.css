@@ -1,6 +1,6 @@
 /* Request detail page — ported from request-detail.html. */
 
-.request-detail-page { display: flex; height: 100vh; overflow: hidden; }
+.request-detail-page { display: flex; height: calc(100vh / var(--app-zoom, 1)); overflow: hidden; }
 
 /* ── Header card ── */
 .header-card { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 20px; flex-shrink: 0; }

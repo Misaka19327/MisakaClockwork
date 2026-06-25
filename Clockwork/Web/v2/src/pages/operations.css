@@ -1,6 +1,6 @@
 /* Operations center page — ported from operations.html. */
 
-.operations-page { display: flex; height: 100vh; overflow: hidden; }
+.operations-page { display: flex; height: calc(100vh / var(--app-zoom, 1)); overflow: hidden; }
 
 /* ── KPI band ── */
 .kpi-band { padding: 14px 24px 8px; display: flex; gap: 12px; overflow-x: auto; flex-shrink: 0; }

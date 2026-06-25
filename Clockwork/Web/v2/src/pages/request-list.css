@@ -1,6 +1,6 @@
 /* Request list page — ported from request-list.html. Shell/sidebar/topbar/badges are shared. */
 
-.request-list-page { display: flex; height: 100vh; overflow: hidden; }
+.request-list-page { display: flex; height: calc(100vh / var(--app-zoom, 1)); overflow: hidden; }
 
 .list-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .list-table tbody tr { cursor: pointer; }

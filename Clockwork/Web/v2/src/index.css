@@ -63,7 +63,7 @@ a { color: inherit; }
    Shared sidebar (request-list / request-detail / operations)
    ═══════════════════════════════════════════ */
 .sidebar {
-  width: 220px; min-width: 220px; height: 100vh;
+  width: 220px; min-width: 220px; height: calc(100vh / var(--app-zoom, 1));
   background: oklch(15% 0.01 250); color: oklch(85% 0.005 250);
   display: flex; flex-direction: column; font-size: 13px; user-select: none;
 }
@@ -140,7 +140,7 @@ html[data-theme="dark"] .sidebar { border-right: 1px solid oklch(26% 0.01 250); 
 /* ═══════════════════════════════════════════
    Shared main shell
    ═══════════════════════════════════════════ */
-.main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: calc(100vh / var(--app-zoom, 1)); }
 
 /* ═══════════════════════════════════════════
    Shared data table (request-list + operations + request-detail)
