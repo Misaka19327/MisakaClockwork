@@ -203,7 +203,7 @@ function KpiBand({ cat, c, t }) {
       )
     }
     case 'log': {
-      const critical = c.levels.critical || 0
+      const critical = (c.levels && c.levels.critical) || 0
       return (
         <>
           <div className="kpi-card">
@@ -443,6 +443,12 @@ export default function Operations() {
   useEffect(() => {
     if (firstRunRef.current) { firstRunRef.current = false; return }
     setExpandedIdx(null)
+    // Drop the previous category's KPIs immediately so KpiBand doesn't render a stale-shaped
+    // object (e.g. database kpis, which have no `levels`) against the new category (e.g. log,
+    // whose band reads c.levels.critical) — that mismatch threw "Cannot read properties of
+    // undefined (reading 'critical')". The fetch repopulates kpis on its offset-0 response.
+    setKpis(null)
+    setTotal(0)
     reload()
   }, [currentCat, timeWindow, reqType, reload])
 
