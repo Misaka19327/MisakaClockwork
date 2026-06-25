@@ -477,9 +477,14 @@ export default function Operations() {
     return r
   }, [items, currentCat, filterSearch, sortCol, sortDir])
 
-  // Stagger rows on data/filter change.
+  const prevLenRef = useRef(0)
+  // Entrance only on a fresh (re)load (0 → N). Appends (N → N+M) are animated by the reveal
+  // slide-in, so we must not re-stagger the whole list on every append commit.
   useEffect(() => {
-    if (!motionOk() || !tbodyRef.current) return
+    const len = rows.length
+    const fresh = len > 0 && prevLenRef.current === 0
+    prevLenRef.current = len
+    if (!fresh || !motionOk() || !tbodyRef.current) return
     const ctx = gsap.context(() => {
       gsap.from('tr:not(.detail-row)', { opacity: 0, y: 6, duration: 0.2, stagger: 0.012, ease: 'power2.out', clearProps: 'all' })
     }, tbodyRef)
