@@ -425,7 +425,7 @@ function ModelsPanel({ d, t }) {
             )]
           })}
           {actions.length === 0 && (
-            <tr><td colSpan={6}><div className="empty-text">{t('无模型操作流水（默认仅采集写操作）')}</div></td></tr>
+            <tr><td colSpan={6}><div className="op-empty"><div className="empty-text">{t('无模型操作流水（默认仅采集写操作）')}</div></div></td></tr>
           )}
         </tbody>
       </table>

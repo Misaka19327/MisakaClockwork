@@ -74,7 +74,6 @@ html[data-theme="dark"] .data-table tbody tr:not(.detail-row):hover { background
 html[data-theme="dark"] .data-table tbody tr.expanded:not(.detail-row) { background: oklch(22% 0.014 250) !important; }
 
 /* ── Models tab ── */
-.empty-text { font-size: 13px; color: var(--muted); padding: 18px; text-align: center; }
 .model-summary { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .model-card { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
 .model-name { font-family: var(--font-mono); font-weight: 590; color: var(--fg); }
