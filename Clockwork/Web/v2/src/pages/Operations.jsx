@@ -433,7 +433,7 @@ export default function Operations() {
     return { items, nextPageState: { offset: offset + items.length }, hasMore: offset + items.length < (d?.total ?? 0) }
   }, [currentCat, timeWindow, reqType])
 
-  const { items, loading, error, hasMore, reload, loadMore, sentinelRef } = usePagedList({ fetch, batchSize: 50, rootRef: scrollRef })
+  const { items, pending, loading, joining, phase, error, hasMore, reload, loadMore, sentinelRef, revealRegionRef } = usePagedList({ fetch, batchSize: 50, rootRef: scrollRef })
 
   // Reset paging from offset 0 when a primitive filter changes. The hook's own mount effect
   // already fires the initial batch (its `reload` is memoized on batchSize only, so depending on
@@ -603,70 +603,84 @@ export default function Operations() {
           </div>
         )}
 
-        {!loading && !error && (
-          <div className="table-wrap" ref={scrollRef}>
-            <table className="op-table">
-              <thead>
-                <tr>
-                  {ui.cols.map(c => {
-                    const arrow = sortCol === c.id ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
-                    return (
-                      <th key={c.id} className={c.sortable ? 'sortable' : ''} style={{ width: c.w }} onClick={() => c.sortable && onSort(c.id)}>
-                        {t(c.label)}{c.sortable && <span className="sort-arrow">{arrow}</span>}
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody ref={tbodyRef}>
-                {rows.length === 0 && (
-                  <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('无匹配结果')}</div></div></td></tr>
-                )}
-                {rows.flatMap((d, i) => {
-                  const isExp = expandedIdx === i
-                  const main = (
-                    <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => setExpandedIdx(isExp ? null : i)}>
-                      {ui.cols.map(col => <Fragment key={col.id}>{renderCellTd(col, d)}</Fragment>)}
-                    </tr>
+        <div className="table-wrap" ref={scrollRef}>
+          <table className="op-table">
+            <thead>
+              <tr>
+                {ui.cols.map(c => {
+                  const arrow = sortCol === c.id ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
+                  return (
+                    <th key={c.id} className={c.sortable ? 'sortable' : ''} style={{ width: c.w }} onClick={() => c.sortable && onSort(c.id)}>
+                      {t(c.label)}{c.sortable && <span className="sort-arrow">{arrow}</span>}
+                    </th>
                   )
-                  if (!isExp) return [main]
-                  const detail = (
-                    <tr key={`d${i}`} className="detail-row">
-                      <td colSpan={ui.cols.length}>
-                        <div className="detail-panel">
-                          <div className="detail-grid">
-                            {detailFields(currentCat, d, t, goRequest).map(([k, v], idx) => (
-                              <div key={idx} className={`detail-item${FULL_FIELDS.has(k) ? ' full' : ''}`}>
-                                <span className="dk">{k}</span>
-                                <span className="dv">{v}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="detail-actions">
-                            <button className="btn" onClick={(e) => { e.stopPropagation(); setExpandedIdx(null) }}>{t('收起详情')}</button>
-                            <button className="btn primary" onClick={(e) => { e.stopPropagation(); goRequest(d.requestId) }}>
-                              <Icon name="search" size={12} /> {t('查看所属请求')}
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                  return [main, detail]
                 })}
-                {!loading && !error && hasMore && (
-                  <tr ref={sentinelRef}><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>
-                )}
-                {!loading && !hasMore && items.length > 0 && (
-                  <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('没有更早的记录了')}</div></div></td></tr>
-                )}
-                {error && items.length > 0 && (
-                  <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('加载失败')}：{error} <button className="btn" onClick={loadMore}>{t('重试')}</button></div></div></td></tr>
-                )}
+              </tr>
+            </thead>
+            <tbody ref={tbodyRef}>
+              {rows.length === 0 && !loading && (
+                <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('无匹配结果')}</div></div></td></tr>
+              )}
+              {rows.flatMap((d, i) => {
+                const isExp = expandedIdx === i
+                const main = (
+                  <tr key={`r${i}`} className={isExp ? 'expanded' : ''} onClick={() => setExpandedIdx(isExp ? null : i)}>
+                    {ui.cols.map(col => <Fragment key={col.id}>{renderCellTd(col, d)}</Fragment>)}
+                  </tr>
+                )
+                if (!isExp) return [main]
+                const detail = (
+                  <tr key={`d${i}`} className="detail-row">
+                    <td colSpan={ui.cols.length}>
+                      <div className="detail-panel">
+                        <div className="detail-grid">
+                          {detailFields(currentCat, d, t, goRequest).map(([k, v], idx) => (
+                            <div key={idx} className={`detail-item${FULL_FIELDS.has(k) ? ' full' : ''}`}>
+                              <span className="dk">{k}</span>
+                              <span className="dv">{v}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="detail-actions">
+                          <button className="btn" onClick={(e) => { e.stopPropagation(); setExpandedIdx(null) }}>{t('收起详情')}</button>
+                          <button className="btn primary" onClick={(e) => { e.stopPropagation(); goRequest(d.requestId) }}>
+                            <Icon name="search" size={12} /> {t('查看所属请求')}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )
+                return [main, detail]
+              })}
+            </tbody>
+            {pending.length > 0 && (
+              <tbody ref={revealRegionRef} className="pending-tbody">
+                <tr className="pending-hint"><td colSpan={ui.cols.length}>{`${t('已加载')} ${pending.length} ${t('条 · 即将拼接')}`}</td></tr>
+                {pending.flatMap((d, i) => (
+                  <tr key={`p-${i}`} className="pending-row">
+                    {ui.cols.map(col => <Fragment key={col.id}>{renderCellTd(col, d)}</Fragment>)}
+                  </tr>
+                ))}
               </tbody>
-            </table>
-          </div>
-        )}
+            )}
+            <tbody className="footer-tbody">
+              {loading && items.length > 0 && (
+                <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('加载中…')}</div></div></td></tr>
+              )}
+              {hasMore && (
+                <tr ref={sentinelRef}><td colSpan={ui.cols.length} />
+                </tr>
+              )}
+              {!hasMore && items.length > 0 && (
+                <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('没有更早的记录了')}</div></div></td></tr>
+              )}
+              {error && items.length > 0 && (
+                <tr><td colSpan={ui.cols.length}><div className="op-empty"><div className="empty-text">{t('加载失败')}：{error} <button className="btn" onClick={loadMore}>{t('重试')}</button></div></div></td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </main>
     </div>
   )
