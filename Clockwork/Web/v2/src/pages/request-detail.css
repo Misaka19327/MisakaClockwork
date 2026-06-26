@@ -91,6 +91,6 @@ html[data-theme="dark"] .data-table tbody tr.expanded:not(.detail-row) { backgro
 
 /* ── Timeline tooltip (hover) ── */
 .tl-bar-click { cursor: pointer; }
-.tl-tooltip { position: fixed; z-index: 80; transform: translateX(-50%) translateY(calc(-100% - 10px)); background: var(--surface); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px color-mix(in oklch, var(--fg) 16%, transparent); padding: 8px 10px; max-width: 480px; max-height: min(320px, calc(100vh - 24px)); display: flex; flex-direction: column; pointer-events: none; }
+.tl-tooltip { position: fixed; z-index: 80; transform: translateX(-50%) translateY(calc(-100% - 10px)); background: var(--surface); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px color-mix(in oklch, var(--fg) 16%, transparent); padding: 8px 10px; max-width: 640px; max-height: min(360px, calc(100vh - 24px)); display: flex; flex-direction: column; pointer-events: none; }
 .tl-tip-head { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-bottom: 4px; flex: 0 0 auto; }
 .tl-tip-body { font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; flex: 1 1 auto; min-height: 0; overflow: auto; }
