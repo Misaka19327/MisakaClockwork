@@ -79,15 +79,22 @@ function barClass(color) {
 }
 // Sum a model-count map ({ ModelClass: count }) — counts may arrive as strings from storage.
 const sumCounts = (obj) => Object.values(obj || {}).reduce((a, b) => a + (Number(b) || 0), 0)
-// Cursor position for the timeline tooltip, flipped/clamped so the tooltip never overflows the
-// viewport (and so never widens the page). tw/th are the tooltip's max box (matches CSS).
+// Element-anchored tooltip position, clamped to a viewport "safe area" so the tooltip never
+// overflows. A fixed element overflowing the viewport would add a document scrollbar, reflow the
+// timeline (narrower viewport), and make the bar leave the cursor → flicker loop. th matches the
+// CSS max-height; CSS transform only centers horizontally (translateX -50%), top is exact.
 const tipPos = (e) => {
-  const pad = 14, tw = 480, th = 280
+  const r = e.currentTarget.getBoundingClientRect()
+  const gap = 10, tw = 480, th = 320
   const vw = window.innerWidth, vh = window.innerHeight
-  let x = e.clientX + pad, y = e.clientY + pad
-  if (x + tw > vw) x = Math.max(pad, e.clientX - pad - tw)
-  if (y + th > vh) y = Math.max(pad, e.clientY - pad - th)
-  return { x, y }
+  const pad = 12
+  const cx = r.left + r.width / 2
+  const x = Math.max(pad + tw / 2, Math.min(cx, vw - pad - tw / 2))
+  // Check if tooltip (at its max estimated height) would overflow the viewport top
+  // after CSS translateY(calc(-100% - 10px)) lifts it above the bar.
+  const flip = r.top - th - gap < pad
+  const y = flip ? r.bottom + gap : r.top
+  return { x, y, flip }
 }
 
 export default function RequestDetail() {
@@ -351,7 +358,6 @@ function PerformancePanel({ d, t, bars, pct, onBarClick }) {
                 className={`tl-bar ${barClass(b.color)}${b.tab ? ' tl-bar-click' : ''}`}
                 style={{ left: pct(b.start) + '%', width: Math.max(pct(b.duration), 0.3) + '%' }}
                 onMouseEnter={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
-                onMouseMove={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
                 onMouseLeave={b.tip ? () => setHover(null) : undefined}
                 onClick={b.tab ? () => onBarClick(b) : undefined}
               >
@@ -361,7 +367,7 @@ function PerformancePanel({ d, t, bars, pct, onBarClick }) {
           </div>
         ))}
         {hover && (
-          <div className="tl-tooltip" style={{ left: hover.x, top: hover.y }}>
+          <div className="tl-tooltip" style={{ left: hover.x, top: hover.y, transform: hover.flip ? 'translateX(-50%)' : undefined }}>
             <div className="tl-tip-head">{hover.b.label}{hover.b.duration > 0 ? ` · ${hover.b.duration.toFixed(1)} ms` : ''}</div>
             {hover.b.tip ? <div className="tl-tip-body">{hover.b.tip}</div> : null}
           </div>
