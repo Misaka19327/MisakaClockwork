@@ -84,15 +84,17 @@ const sumCounts = (obj) => Object.values(obj || {}).reduce((a, b) => a + (Number
 // translateY lifts by own height). Flips below if viewport top overflows. Horizontal clamping
 // only (no large jumps). Max box tw × th matches CSS.
 const tipPos = (e) => {
-  const gap = 10, tw = 640, th = 360
+  const r = e.currentTarget.getBoundingClientRect()
+  const gap = 10, tw = 800, th = 480
   const vw = window.innerWidth, vh = window.innerHeight
   const pad = 12
-  // Check if tooltip (above cursor) would overflow viewport top
-  const flip = e.clientY - th - gap < pad
-  // Default: anchor at cursor, CSS lifts tooltip above. Flip: below cursor.
-  const y = flip ? e.clientY + gap : e.clientY
-  // Center horizontally on cursor, clamp to viewport edges
-  const x = Math.max(pad + tw / 2, Math.min(e.clientX, vw - pad - tw / 2))
+  // Anchor to bar element (center x, top y). CSS translateY(-100%) lifts above.
+  const cx = r.left + r.width / 2
+  const x = Math.max(pad + tw / 2, Math.min(cx, vw - pad - tw / 2))
+  // Check if tooltip would overflow viewport top
+  const flip = r.top - th - gap < pad
+  // Default: above bar (CSS lifts). Flip: below bar.
+  const y = flip ? r.bottom + gap : r.top
   return { x, y, flip }
 }
 
@@ -366,7 +368,6 @@ function PerformancePanel({ d, t, bars, pct, onBarClick }) {
                 style={{ left: pct(b.start) + '%', width: Math.max(pct(b.duration), 0.3) + '%' }}
                onMouseEnter={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
                onMouseLeave={b.tip ? () => setHover(null) : undefined}
-                onMouseMove={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
                onClick={b.tab ? () => onBarClick(b) : undefined}
               >
                 {b.duration > 0 ? `${b.duration.toFixed(1)} ms` : ''}
