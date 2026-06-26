@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
@@ -80,22 +80,16 @@ function barClass(color) {
 }
 // Sum a model-count map ({ ModelClass: count }) — counts may arrive as strings from storage.
 const sumCounts = (obj) => Object.values(obj || {}).reduce((a, b) => a + (Number(b) || 0), 0)
-// Tooltip position relative to cursor, viewport-aware. Default: above cursor centered (CSS
-// translateY lifts by own height). Flips below if viewport top overflows. Horizontal clamping
-// only (no large jumps). Max box tw × th matches CSS.
+// Tooltip position anchored to the timeline bar. The tooltip is rendered in a portal, so these
+// viewport coordinates are not affected by parent transforms.
 const tipPos = (e) => {
   const r = e.currentTarget.getBoundingClientRect()
-  const gap = 10, tw = 800, th = 480
-  const vw = window.innerWidth, vh = window.innerHeight
+  const tw = 800
+  const vw = window.innerWidth
   const pad = 12
-  // Anchor to bar element (center x, top y). CSS translateY(-100%) lifts above.
   const cx = r.left + r.width / 2
   const x = Math.max(pad + tw / 2, Math.min(cx, vw - pad - tw / 2))
-  // Check if tooltip would overflow viewport top
-  const flip = r.top - th - gap < pad
-  // Default: above bar (CSS lifts). Flip: below bar.
-  const y = flip ? r.bottom + gap : r.top
-  return { x, y, flip }
+  return { x, y: r.top, anchorTop: r.top, anchorBottom: r.bottom, flip: false }
 }
 
 export default function RequestDetail() {
@@ -325,8 +319,41 @@ function OverviewPanel({ d, t }) {
 
 function PerformancePanel({ d, t, bars, pct, onBarClick }) {
   const [hover, setHover] = useState(null)
+  const hideTimer = useRef(null)
+  const tipRef = useRef(null)
+  const clearHide = () => {
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current)
+      hideTimer.current = null
+    }
+  }
+  const scheduleHide = () => {
+    clearHide()
+    hideTimer.current = setTimeout(() => setHover(null), 140)
+  }
+  useEffect(() => clearHide, [])
+  useLayoutEffect(() => {
+    if (!hover || !tipRef.current) return
+    const pad = 12
+    const gap = 10
+    const rect = tipRef.current.getBoundingClientRect()
+    if (!hover.flip && rect.top < pad) {
+      setHover((prev) => prev ? { ...prev, flip: true, y: prev.anchorBottom + gap } : prev)
+      return
+    }
+    if (hover.flip && rect.bottom > window.innerHeight - pad) {
+      const y = Math.max(pad, window.innerHeight - pad - rect.height)
+      setHover((prev) => prev && prev.y !== y ? { ...prev, y } : prev)
+    }
+  }, [hover])
   const tipPortal = hover && createPortal(
-    <div className="tl-tooltip" style={{ left: hover.x, top: hover.y, transform: hover.flip ? 'translateX(-50%)' : undefined }}>
+    <div
+      ref={tipRef}
+      className="tl-tooltip"
+      style={{ left: hover.x, top: hover.y, transform: hover.flip ? 'translateX(-50%)' : undefined }}
+      onMouseEnter={clearHide}
+      onMouseLeave={scheduleHide}
+    >
       <div className="tl-tip-head">{hover.b.label}{hover.b.duration > 0 ? ` · ${hover.b.duration.toFixed(1)} ms` : ''}</div>
       {hover.b.tip ? <div className="tl-tip-body">{hover.b.tip}</div> : null}
     </div>,
@@ -366,8 +393,8 @@ function PerformancePanel({ d, t, bars, pct, onBarClick }) {
               <div
                 className={`tl-bar ${barClass(b.color)}${b.tab ? ' tl-bar-click' : ''}`}
                 style={{ left: pct(b.start) + '%', width: Math.max(pct(b.duration), 0.3) + '%' }}
-               onMouseEnter={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
-               onMouseLeave={b.tip ? () => setHover(null) : undefined}
+               onMouseEnter={b.tip ? (e) => { clearHide(); setHover({ ...tipPos(e), b }) } : undefined}
+               onMouseLeave={b.tip ? scheduleHide : undefined}
                onClick={b.tab ? () => onBarClick(b) : undefined}
               >
                 {b.duration > 0 ? `${b.duration.toFixed(1)} ms` : ''}
