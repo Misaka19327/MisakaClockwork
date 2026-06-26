@@ -1,70 +1,18 @@
 stages:
-    - package
-    - upload
     - release
 
-variables:
-    PACKAGE_NAME: "misakaclockwork"
-
-package:
-    stage: package
-
-    script:
-        - VERSION="$CI_COMMIT_TAG"
-        - FILE="${PACKAGE_NAME}-${VERSION}.zip"
-
-        - echo "Packing ${FILE}"
-
-        - zip -r "$FILE" . \
-            -x ".git/*" \
-            -x ".gitlab-ci.yml" \
-            -x ".idea/*" \
-            -x ".DS_Store"
-
-    artifacts:
-        paths:
-            - "*.zip"
-
-    rules:
-        - if: '$CI_COMMIT_TAG'
-
-upload:
-    stage: upload
-
-    dependencies:
-        - package
-
-    script:
-        - VERSION="$CI_COMMIT_TAG"
-        - FILE="${PACKAGE_NAME}-${VERSION}.zip"
-
-        - echo "Uploading ${FILE}"
-
-        - |
-            curl \
-              --fail \
-              --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-              --upload-file "${FILE}" \
-              "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${VERSION}/${FILE}"
-
-    rules:
-        - if: '$CI_COMMIT_TAG'
-
-release:
+release-composer:
     stage: release
 
     script:
+        - echo "Publishing Composer package for tag: $CI_COMMIT_TAG"
+
         - |
-            curl \
-              --fail \
+            curl --fail-with-body \
               --request POST \
-              --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-              --form "name=${CI_COMMIT_TAG}" \
-              --form "tag_name=${CI_COMMIT_TAG}" \
-              --form "description=Release ${CI_COMMIT_TAG}" \
-              --form "assets[links][][name]=${PACKAGE_NAME}-${CI_COMMIT_TAG}.zip" \
-              --form "assets[links][][url]=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${CI_COMMIT_TAG}/${PACKAGE_NAME}-${CI_COMMIT_TAG}.zip" \
-              "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases"
+              --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+              --data "tag=$CI_COMMIT_TAG" \
+              "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/composer"
 
     rules:
         - if: '$CI_COMMIT_TAG'
