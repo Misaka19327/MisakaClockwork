@@ -79,6 +79,16 @@ function barClass(color) {
 }
 // Sum a model-count map ({ ModelClass: count }) — counts may arrive as strings from storage.
 const sumCounts = (obj) => Object.values(obj || {}).reduce((a, b) => a + (Number(b) || 0), 0)
+// Cursor position for the timeline tooltip, flipped/clamped so the tooltip never overflows the
+// viewport (and so never widens the page). tw/th are the tooltip's max box (matches CSS).
+const tipPos = (e) => {
+  const pad = 14, tw = 480, th = 280
+  const vw = window.innerWidth, vh = window.innerHeight
+  let x = e.clientX + pad, y = e.clientY + pad
+  if (x + tw > vw) x = Math.max(pad, e.clientX - pad - tw)
+  if (y + th > vh) y = Math.max(pad, e.clientY - pad - th)
+  return { x, y }
+}
 
 export default function RequestDetail() {
   const { t } = useApp()
@@ -340,7 +350,8 @@ function PerformancePanel({ d, t, bars, pct, onBarClick }) {
               <div
                 className={`tl-bar ${barClass(b.color)}${b.tab ? ' tl-bar-click' : ''}`}
                 style={{ left: pct(b.start) + '%', width: Math.max(pct(b.duration), 0.3) + '%' }}
-                onMouseEnter={b.tip ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setHover({ x: r.left + r.width / 2, y: r.top, b }) } : undefined}
+                onMouseEnter={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
+                onMouseMove={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
                 onMouseLeave={b.tip ? () => setHover(null) : undefined}
                 onClick={b.tab ? () => onBarClick(b) : undefined}
               >
