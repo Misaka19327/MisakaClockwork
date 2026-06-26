@@ -1,0 +1,40 @@
+stages:
+  - package
+  - release
+
+package:
+  stage: package
+  image: alpine
+
+  before_script:
+    - apk add zip
+
+  script:
+    - VERSION=$CI_COMMIT_TAG
+    - zip -r "my-package-${VERSION}.zip" . \
+      -x ".git/*"
+
+  artifacts:
+    paths:
+      - "*.zip"
+
+  rules:
+    - if: $CI_COMMIT_TAG
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+
+  needs:
+    - package
+
+  script:
+    - echo "Creating release"
+
+  release:
+    tag_name: "$CI_COMMIT_TAG"
+    name: "$CI_COMMIT_TAG"
+    description: "Release $CI_COMMIT_TAG"
+
+  rules:
+    - if: $CI_COMMIT_TAG
