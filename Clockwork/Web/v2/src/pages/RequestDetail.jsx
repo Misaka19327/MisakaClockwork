@@ -79,20 +79,21 @@ function barClass(color) {
 }
 // Sum a model-count map ({ ModelClass: count }) — counts may arrive as strings from storage.
 const sumCounts = (obj) => Object.values(obj || {}).reduce((a, b) => a + (Number(b) || 0), 0)
-// Element-anchored tooltip position, clamped to a viewport "safe area" so the tooltip never
-// overflows. A fixed element overflowing the viewport would add a document scrollbar, reflow the
-// timeline (narrower viewport), and make the bar leave the cursor → flicker loop. th matches the
-// CSS max-height; CSS transform only centers horizontally (translateX -50%), top is exact.
+// Element-anchored tooltip position. Anchored to the bar element (center x, top y). CSS
+// translateY(-100% - 10px) lifts the tooltip by its own rendered height + 10px so it sits
+// right above the bar. If it would overflow the viewport top, flips to below the bar instead.
 const tipPos = (e) => {
   const r = e.currentTarget.getBoundingClientRect()
   const gap = 10, tw = 480, th = 320
   const vw = window.innerWidth, vh = window.innerHeight
   const pad = 12
+  // Horizontal center of the bar, clamped to viewport
   const cx = r.left + r.width / 2
   const x = Math.max(pad + tw / 2, Math.min(cx, vw - pad - tw / 2))
-  // Check if tooltip (at its max estimated height) would overflow the viewport top
-  // after CSS translateY(calc(-100% - 10px)) lifts it above the bar.
+  // Check if tooltip (after CSS translateY lifts it above the bar) would overflow
+  // the viewport top. Using th as max-height estimate: r.top - th - gap < pad
   const flip = r.top - th - gap < pad
+  // Default: anchor at bar top (CSS lifts tooltip above). Flip: below bar.
   const y = flip ? r.bottom + gap : r.top
   return { x, y, flip }
 }
