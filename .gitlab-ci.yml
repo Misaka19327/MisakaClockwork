@@ -1,40 +1,70 @@
 stages:
-  - package
-  - release
+    - package
+    - upload
+    - release
+
+variables:
+    PACKAGE_NAME: "misakaclockwork"
 
 package:
-  stage: package
-  image: alpine
+    stage: package
 
-  before_script:
-    - apk add zip
+    script:
+        - VERSION="$CI_COMMIT_TAG"
+        - FILE="${PACKAGE_NAME}-${VERSION}.zip"
 
-  script:
-    - VERSION=$CI_COMMIT_TAG
-    - zip -r "my-package-${VERSION}.zip" . \
-      -x ".git/*"
+        - echo "Packing ${FILE}"
 
-  artifacts:
-    paths:
-      - "*.zip"
+        - zip -r "$FILE" . \
+            -x ".git/*" \
+            -x ".gitlab-ci.yml" \
+            -x ".idea/*" \
+            -x ".DS_Store"
 
-  rules:
-    - if: $CI_COMMIT_TAG
+    artifacts:
+        paths:
+            - "*.zip"
+
+    rules:
+        - if: '$CI_COMMIT_TAG'
+
+upload:
+    stage: upload
+
+    dependencies:
+        - package
+
+    script:
+        - VERSION="$CI_COMMIT_TAG"
+        - FILE="${PACKAGE_NAME}-${VERSION}.zip"
+
+        - echo "Uploading ${FILE}"
+
+        - |
+            curl \
+              --fail \
+              --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+              --upload-file "${FILE}" \
+              "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${VERSION}/${FILE}"
+
+    rules:
+        - if: '$CI_COMMIT_TAG'
 
 release:
-  stage: release
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
+    stage: release
 
-  needs:
-    - package
+    script:
+        - |
+            curl \
+              --fail \
+              --request POST \
+              --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+              --form "name=${CI_COMMIT_TAG}" \
+              --form "tag_name=${CI_COMMIT_TAG}" \
+              --form "description=Release ${CI_COMMIT_TAG}" \
+              --form "assets[links][][name]=${PACKAGE_NAME}-${CI_COMMIT_TAG}.zip" \
+              --form "assets[links][][url]=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${CI_COMMIT_TAG}/${PACKAGE_NAME}-${CI_COMMIT_TAG}.zip" \
+              "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases"
 
-  script:
-    - echo "Creating release"
-
-  release:
-    tag_name: "$CI_COMMIT_TAG"
-    name: "$CI_COMMIT_TAG"
-    description: "Release $CI_COMMIT_TAG"
-
-  rules:
-    - if: $CI_COMMIT_TAG
+    rules:
+        - if: '$CI_COMMIT_TAG'
