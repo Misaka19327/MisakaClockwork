@@ -43,8 +43,8 @@ function Kv({ k, v, title }) {
 }
 
 // Toggle a set of expanded row indices — multiple rows can be open at once (each click flips one).
-function useToggleSet() {
-  const [open, setOpen] = useState(() => new Set())
+function useToggleSet(initial = []) {
+  const [open, setOpen] = useState(() => new Set(initial))
   const toggle = (i) => setOpen((prev) => {
     const next = new Set(prev)
     next.has(i) ? next.delete(i) : next.add(i)
@@ -88,6 +88,8 @@ export default function RequestDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState('overview')
+  // Jump-to-row from the timeline: { tab, index } set by clicking a bar; consumed (opened + scrolled) then cleared.
+  const [autoOpen, setAutoOpen] = useState(null)
   const panelRef = useRef(null)
 
   // Fetch the full (extended) request by id; cancel on id change.
@@ -136,22 +138,57 @@ export default function RequestDetail() {
   }, [tab])
 
   const bars = useMemo(() => {
-    if (!d) return []
-    const total = d.totalDuration || 1
-    const all = [
-      ...d.timelineData.map(e => ({ label: e.description, start: e.start, end: e.end, color: e.color || 'grey' })),
-      ...d.databaseQueries.map((q, i) => {
-        const fs = [20, 70, 105, 160][i] || (180 + i * 8)
-        const s = q.duration > 100 ? total - q.duration - (i * 5) : fs
-        return { label: 'SQL #' + (i + 1), start: s, end: s + q.duration, color: (q.tags && q.tags.includes('slow')) ? 'red' : 'green' }
-      }),
-      ...d.httpRequests.map((r, i) => ({ label: 'HTTP #' + (i + 1), start: total - r.duration - 100 - i * 30, end: total - 100 - i * 30, color: 'purple' })),
-      ...d.cacheQueries.map((c, i) => ({ label: 'Cache #' + (i + 1), start: 5 + i * 2, end: 5 + i * 2 + (c.duration || 0.5), color: 'grey' })),
-    ]
+    if (!d || !d.time) return []
+    const rel = (abs) => abs == null ? null : (Number(abs) - d.time) * 1000 // absolute microtime → ms from request start
+    const ERR = new Set(['emergency', 'alert', 'critical', 'error'])
+    const mk = (label, startMs, durMs, color, tab, index, tip) => ({ label, start: startMs, duration: durMs || 0, color, tab, index, tip })
+    const all = []
+    d.timelineData.forEach((e) => {
+      const s = rel(e.start); if (s == null) return
+      all.push(mk(e.description || '事件', s, e.duration ?? Math.max(0, rel(e.end) - s), e.color || 'blue', null, null, e.description || ''))
+    })
+    d.databaseQueries.forEach((q, i) => {
+      const s = rel(q.time); if (s == null) return
+      all.push(mk('SQL #' + (i + 1), s, q.duration, (q.tags && q.tags.includes('slow')) ? 'red' : 'green', 'database', i, q.query || ''))
+    })
+    d.cacheQueries.forEach((c, i) => {
+      const s = rel(c.time); if (s == null) return
+      all.push(mk('Cache #' + (i + 1), s, c.duration, 'grey', 'cache', i, c.key ? `${c.key} = ${fmtVal(c.value)}` : fmtVal(c.value)))
+    })
+    d.httpRequests.forEach((r, i) => {
+      const s = rel(r.time); if (s == null) return
+      const bad = (r.response && r.response.status >= 400) || r.error
+      all.push(mk('HTTP #' + (i + 1), s, r.duration, bad ? 'red' : 'purple', 'http', i, `${r.request ? r.request.method + ' ' + r.request.url : ''}${r.error ? '\n' + r.error : ''}`))
+    })
+    d.redisCommands.forEach((r, i) => {
+      const s = rel(r.time); if (s == null) return
+      all.push(mk('Redis #' + (i + 1), s, r.duration, 'grey', 'redis', i, r.command + (r.key ? ' ' + r.key : '')))
+    })
+    d.logs.forEach((l, i) => {
+      if (!ERR.has(l.level)) return
+      const s = rel(l.time); if (s == null) return
+      all.push(mk('⚠ ' + l.level, s, 0, 'red', 'log', i, l.message || ''))
+    })
     return all.sort((a, b) => a.start - b.start)
   }, [d])
 
   const pct = (v) => d && d.totalDuration ? Math.max(0, Math.min(100, (v / d.totalDuration) * 100)) : 0
+
+  const handleBarClick = (b) => {
+    if (b.tab) { setTab(b.tab); setAutoOpen({ tab: b.tab, index: b.index }) }
+  }
+  useEffect(() => {
+    if (!autoOpen) return
+    // The target tab's panel just mounted fresh (nothing expanded), so its main rows are in
+    // item order. Open row N by simulating its click, then scroll it into view.
+    const rows = document.querySelectorAll('.tab-panel table tbody tr:not(.detail-row)')
+    const row = rows[autoOpen.index]
+    if (row) {
+      if (!row.classList.contains('expanded')) row.click()
+      row.scrollIntoView({ block: 'center' })
+    }
+    setAutoOpen(null)
+  }, [autoOpen])
 
   return (
     <div className="request-detail-page">
@@ -203,7 +240,7 @@ export default function RequestDetail() {
         <div className="tab-content" ref={panelRef}>
           <div className="tab-panel">
             {tab === 'overview' && <OverviewPanel d={d} t={t} />}
-            {tab === 'performance' && <PerformancePanel d={d} t={t} bars={bars} pct={pct} />}
+            {tab === 'performance' && <PerformancePanel d={d} t={t} bars={bars} pct={pct} onBarClick={handleBarClick} />}
             {tab === 'database' && <DatabasePanel d={d} t={t} />}
             {tab === 'models' && <ModelsPanel d={d} t={t} />}
             {tab === 'cache' && <CachePanel d={d} t={t} />}
@@ -268,7 +305,8 @@ function OverviewPanel({ d, t }) {
   )
 }
 
-function PerformancePanel({ d, t, bars, pct }) {
+function PerformancePanel({ d, t, bars, pct, onBarClick }) {
+  const [hover, setHover] = useState(null)
   return (
     <>
       <div className="detail-kpi-row">
@@ -297,14 +335,26 @@ function PerformancePanel({ d, t, bars, pct }) {
         </div>
         {bars.map((b, i) => (
           <div className="tl-row" key={i}>
-            <div className="tl-label">{b.label}</div>
+            <div className="tl-label" title={b.label}>{b.label}</div>
             <div className="tl-track">
-              <div className={`tl-bar ${barClass(b.color)}`} style={{ left: pct(b.start) + '%', width: Math.max(pct(b.end - b.start), 0.3) + '%' }}>
-                {(b.end - b.start).toFixed(1)} ms
+              <div
+                className={`tl-bar ${barClass(b.color)}${b.tab ? ' tl-bar-click' : ''}`}
+                style={{ left: pct(b.start) + '%', width: Math.max(pct(b.duration), 0.3) + '%' }}
+                onMouseEnter={b.tip ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setHover({ x: r.left + r.width / 2, y: r.top, b }) } : undefined}
+                onMouseLeave={b.tip ? () => setHover(null) : undefined}
+                onClick={b.tab ? () => onBarClick(b) : undefined}
+              >
+                {b.duration > 0 ? `${b.duration.toFixed(1)} ms` : ''}
               </div>
             </div>
           </div>
         ))}
+        {hover && (
+          <div className="tl-tooltip" style={{ left: hover.x, top: hover.y }}>
+            <div className="tl-tip-head">{hover.b.label}{hover.b.duration > 0 ? ` · ${hover.b.duration.toFixed(1)} ms` : ''}</div>
+            {hover.b.tip ? <div className="tl-tip-body">{hover.b.tip}</div> : null}
+          </div>
+        )}
       </div>
     </>
   )

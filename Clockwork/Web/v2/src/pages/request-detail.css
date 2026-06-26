@@ -88,3 +88,9 @@ html[data-theme="dark"] .data-table tbody tr.expanded:not(.detail-row) { backgro
 .model-action-badge.created   { background: color-mix(in oklch, var(--success) 14%, transparent); color: var(--success); }
 .model-action-badge.updated   { background: color-mix(in oklch, var(--warn) 14%, transparent); color: var(--warn); }
 .model-action-badge.deleted   { background: color-mix(in oklch, var(--danger) 14%, transparent); color: var(--danger); }
+
+/* ── Timeline tooltip (hover) ── */
+.tl-bar-click { cursor: pointer; }
+.tl-tooltip { position: fixed; z-index: 80; transform: translate(-50%, calc(-100% - 10px)); background: var(--surface); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px color-mix(in oklch, var(--fg) 16%, transparent); padding: 8px 10px; max-width: 480px; pointer-events: none; }
+.tl-tip-head { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.tl-tip-body { font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: hidden; }
