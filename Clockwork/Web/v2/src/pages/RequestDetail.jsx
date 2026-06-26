@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
 import { gsap, motionOk } from '../lib/motion.js'
@@ -144,7 +145,7 @@ export default function RequestDetail() {
   useEffect(() => {
     if (!motionOk() || !panelRef.current) return
     const ctx = gsap.context(() => {
-      gsap.fromTo('.tab-panel', { opacity: 0, y: 4 }, { opacity: 1, y: 0, duration: 0.15, ease: 'power2.out' })
+      gsap.fromTo('.tab-panel', { opacity: 0, y: 4 }, { opacity: 1, y: 0, duration: 0.15, ease: 'power2.out', clearProps: 'all' })
       if (tab === 'performance') {
         gsap.fromTo('.tl-bar', { scaleX: 0, transformOrigin: 'left center' }, { scaleX: 1, duration: 0.5, stagger: 0.04, ease: 'power2.out', delay: 0.05 })
       }
@@ -265,8 +266,8 @@ export default function RequestDetail() {
             {tab === 'events' && <EventsPanel d={d} t={t} />}
             {tab === 'views' && <ViewsPanel d={d} t={t} />}
           </div>
-        </div>
-        </>
+     </div>
+    </>
         )}
       </main>
     </div>
@@ -322,8 +323,16 @@ function OverviewPanel({ d, t }) {
 
 function PerformancePanel({ d, t, bars, pct, onBarClick }) {
   const [hover, setHover] = useState(null)
+  const tipPortal = hover && createPortal(
+    <div className="tl-tooltip" style={{ left: hover.x, top: hover.y, transform: hover.flip ? 'translateX(-50%)' : undefined }}>
+      <div className="tl-tip-head">{hover.b.label}{hover.b.duration > 0 ? ` · ${hover.b.duration.toFixed(1)} ms` : ''}</div>
+      {hover.b.tip ? <div className="tl-tip-body">{hover.b.tip}</div> : null}
+    </div>,
+    document.body
+  )
   return (
     <>
+      {tipPortal}
       <div className="detail-kpi-row">
         <div className="kpi-card"><div className="kpi-val">{d.dbStats.count}</div><div className="kpi-lbl">{t('数据库查询')}</div></div>
         <div className="kpi-card"><div className="kpi-val">{d.dbStats.slow}</div><div className="kpi-lbl">{t('慢查询')}</div></div>
@@ -355,21 +364,16 @@ function PerformancePanel({ d, t, bars, pct, onBarClick }) {
               <div
                 className={`tl-bar ${barClass(b.color)}${b.tab ? ' tl-bar-click' : ''}`}
                 style={{ left: pct(b.start) + '%', width: Math.max(pct(b.duration), 0.3) + '%' }}
-                onMouseEnter={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
-                onMouseLeave={b.tip ? () => setHover(null) : undefined}
-                onClick={b.tab ? () => onBarClick(b) : undefined}
+               onMouseEnter={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
+               onMouseLeave={b.tip ? () => setHover(null) : undefined}
+                onMouseMove={b.tip ? (e) => setHover({ ...tipPos(e), b }) : undefined}
+               onClick={b.tab ? () => onBarClick(b) : undefined}
               >
                 {b.duration > 0 ? `${b.duration.toFixed(1)} ms` : ''}
               </div>
             </div>
           </div>
         ))}
-        {hover && (
-          <div className="tl-tooltip" style={{ left: hover.x, top: hover.y, transform: hover.flip ? 'translateX(-50%)' : undefined }}>
-            <div className="tl-tip-head">{hover.b.label}{hover.b.duration > 0 ? ` · ${hover.b.duration.toFixed(1)} ms` : ''}</div>
-            {hover.b.tip ? <div className="tl-tip-body">{hover.b.tip}</div> : null}
-          </div>
-        )}
       </div>
     </>
   )
@@ -728,3 +732,4 @@ function ViewsPanel({ d, t }) {
     </>
   )
 }
+
