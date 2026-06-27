@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
@@ -80,16 +80,23 @@ function barClass(color) {
 }
 // Sum a model-count map ({ ModelClass: count }) — counts may arrive as strings from storage.
 const sumCounts = (obj) => Object.values(obj || {}).reduce((a, b) => a + (Number(b) || 0), 0)
-// Tooltip position anchored to the timeline bar. The tooltip is rendered in a portal, so these
-// viewport coordinates are not affected by parent transforms.
+// Tooltip position anchored to the timeline bar. Placed to the SIDE of the bar (right, else left)
+// at the bar's row, clamped into a viewport safe area — so it never sits over the hovered bar and
+// only overlaps the few rows next to it. Rendered via portal, so viewport coords are unaffected by
+// parent transforms. th matches the CSS max-height; tw matches the CSS max-width — both clamped to
+// the viewport so the tooltip can never be wider/taller than the page.
 const tipPos = (e) => {
   const r = e.currentTarget.getBoundingClientRect()
-  const tw = 800
-  const vw = window.innerWidth
-  const pad = 12
-  const cx = r.left + r.width / 2
-  const x = Math.max(pad + tw / 2, Math.min(cx, vw - pad - tw / 2))
-  return { x, y: r.top, anchorTop: r.top, anchorBottom: r.bottom, flip: false }
+  const gap = 10, pad = 12
+  const vw = window.innerWidth, vh = window.innerHeight
+  const tw = Math.min(480, vw - pad * 2)             // cap width to the viewport (mirrors CSS max-width)
+  const th = Math.min(170, vh - pad * 2)             // cap height to the viewport (mirrors CSS max-height)
+  let x = r.right + gap                          // prefer to the right of the bar
+  if (x + tw > vw - pad) x = r.left - gap - tw   // not enough room on the right → left
+  if (x < pad) x = r.left + r.width / 2 - tw / 2 // both sides tight → centered
+  x = Math.max(pad, Math.min(x, vw - pad - tw))
+  const y = Math.max(pad, Math.min(r.top, vh - pad - th))
+  return { x, y }
 }
 
 export default function RequestDetail() {
@@ -332,25 +339,11 @@ function PerformancePanel({ d, t, bars, pct, onBarClick }) {
     hideTimer.current = setTimeout(() => setHover(null), 140)
   }
   useEffect(() => clearHide, [])
-  useLayoutEffect(() => {
-    if (!hover || !tipRef.current) return
-    const pad = 12
-    const gap = 10
-    const rect = tipRef.current.getBoundingClientRect()
-    if (!hover.flip && rect.top < pad) {
-      setHover((prev) => prev ? { ...prev, flip: true, y: prev.anchorBottom + gap } : prev)
-      return
-    }
-    if (hover.flip && rect.bottom > window.innerHeight - pad) {
-      const y = Math.max(pad, window.innerHeight - pad - rect.height)
-      setHover((prev) => prev && prev.y !== y ? { ...prev, y } : prev)
-    }
-  }, [hover])
   const tipPortal = hover && createPortal(
     <div
       ref={tipRef}
       className="tl-tooltip"
-      style={{ left: hover.x, top: hover.y, transform: hover.flip ? 'translateX(-50%)' : undefined }}
+      style={{ left: hover.x, top: hover.y }}
       onMouseEnter={clearHide}
       onMouseLeave={scheduleHide}
     >
